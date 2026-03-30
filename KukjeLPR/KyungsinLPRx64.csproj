@@ -67,14 +67,26 @@
     <ApplicationIcon>009videocamera1_99889.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="EvoCSAPI, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+    <Reference Include="EvoCSAPI">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>C:\Program Files\EvoEngineSDK\Bin\x64\EvoCSAPI.dll</HintPath>
+      <HintPath>dll\EvoCSAPI.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
-    <Reference Include="SDKNetLib, Version=1.7.0.0, Culture=neutral, processorArchitecture=MSIL">
+    <Reference Include="SDKNetLib">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\LPRCAM 20190227 Ethernet Display\KukjeLPR\bin\Debug\SDKNetLib.dll</HintPath>
+      <HintPath>dll\SDKNetLib.dll</HintPath>
+    </Reference>
+    <Reference Include="SerialDevice">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\SerialDevice.dll</HintPath>
+    </Reference>
+    <Reference Include="LibSocket">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\LibSocket.dll</HintPath>
+    </Reference>
+    <Reference Include="Util">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\Util.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -137,6 +149,21 @@
     <Compile Include="Class\IPCamera.cs" />
     <Compile Include="Class\IPCameraAsync.cs" />
     <Compile Include="Class\IPCameraUtils.cs" />
+    <Compile Include="Class\iNova2\IPCamera.cs" />
+    <Compile Include="Class\iNova2\IPCameraAsync.cs" />
+    <Compile Include="Class\iNova2\IPCameraUtils.cs" />
+    <Compile Include="Class\iNova2\AutoFlashConfigForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Class\iNova2\AutoFlashConfigForm.designer.cs">
+      <DependentUpon>AutoFlashConfigForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Class\iNova2\frmAdvFeature.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Class\iNova2\frmAdvFeature.designer.cs">
+      <DependentUpon>frmAdvFeature.cs</DependentUpon>
+    </Compile>
     <Compile Include="Form\frmPicConfig.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -238,20 +265,6 @@
       <Isolated>False</Isolated>
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\Library\SerialDevice\SerialDevice\SerialDevice.csproj">
-      <Project>{76cb1350-c8b8-4905-bc36-2ebde64524b3}</Project>
-      <Name>SerialDevice</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\Library\Socket\LibSocket\LibSocket.csproj">
-      <Project>{91429523-d4c9-4719-9273-549aa724b302}</Project>
-      <Name>LibSocket</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\..\..\Library\Util\Util.csproj">
-      <Project>{29b31f1c-4d31-421d-ba9e-81d531d38e26}</Project>
-      <Name>Util</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
