@@ -443,7 +443,7 @@ namespace KyungsinLPR {
                                 var _netDev = NetDev;
                                 var _serialDev = SerialDev;
                                 System.Threading.Tasks.Task.Run(async () => {
-                                    await System.Threading.Tasks.Task.Delay(3000);
+                                    await System.Threading.Tasks.Task.Delay(5000);
                                     try {
                                         if(_isNet && _netDev != null)
                                             _netDev.SendMsg(_defMent1, clsFunction.GetColor8Int(_defColor1), _defMent2, clsFunction.GetColor8Int(_defColor2));
