@@ -404,38 +404,39 @@ namespace KyungsinLPR {
 
                 if(Type.Equals((int)ClsStructure.InoutType.입구용)) {
                     if(NoDriving.Check(CarNo)) {
-                        if(NoDriving.WriteLpr) {
-                            QueryStruct Noitem = new QueryStruct();
-                            //LPRTRNS
-                            Noitem.Query = clsQuery.SetEntranceLprTrns(ProcTime, Env.CommunicationEnv.ParkInfo, RegedCar[CamIdx], CarNo, Image, RegResult, LprInfo.ChNo);
-                            Util.Logger.Query(Noitem.Query);
-                            //QList.Add(item);
-                            Util.clsMssql.ExecQuery(TCon, Noitem.Query);
-                            blWriteLprTrns = true;
-                        }
-                        if(NoDriving.DisPlay) {
-                            string Ment1 = NoDriving.Ment1;
-                            string Ment2 = NoDriving.Ment2;
-                            if(NoDriving.Ment1 == "차량번호")
-                                Ment1 = CarNo;
-                            else if(NoDriving.Ment2 == "차량번호")
-                                Ment2 = CarNo;
-
-                            if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use))) {
-                                NetDev.SendMsg(Ment1, clsFunction.GetColor8Int(NoDriving.Color1), Ment2, clsFunction.GetColor8Int(NoDriving.Color2));
-                            } else {
-                                SerialDev.DisPlayMent(CamIdx, Ment1, NoDriving.Color1, Ment2, NoDriving.Color2);
-                            }
-                        }
-                        Rtn += "부제 체크 해당";
-                        blNoDriving = true;
-                        // Exception2: CUSTDEF.iPsscrdZone=2 이면 부제 제외
+                        // Exception2: 전광판 출력 전에 먼저 iPsscrdZone=2 여부 판단
                         if(NoDriving.Exception2 && RegedInfo != null && RegedInfo.Length > 0) {
                             if(RegedInfo[0]["iPsscrdZone"].ToString() == "2") {
                                 blNoDrivingException2 = true;
                                 Rtn += " (iPsscrdZone=2 부제 제외)";
                             }
                         }
+                        // iPsscrdZone=2 제외 차량은 부제 LPR기록/전광판 출력 건너뜀
+                        if(!blNoDrivingException2) {
+                            if(NoDriving.WriteLpr) {
+                                QueryStruct Noitem = new QueryStruct();
+                                //LPRTRNS
+                                Noitem.Query = clsQuery.SetEntranceLprTrns(ProcTime, Env.CommunicationEnv.ParkInfo, RegedCar[CamIdx], CarNo, Image, RegResult, LprInfo.ChNo);
+                                Util.Logger.Query(Noitem.Query);
+                                Util.clsMssql.ExecQuery(TCon, Noitem.Query);
+                                blWriteLprTrns = true;
+                            }
+                            if(NoDriving.DisPlay) {
+                                string Ment1 = NoDriving.Ment1;
+                                string Ment2 = NoDriving.Ment2;
+                                if(NoDriving.Ment1 == "차량번호")
+                                    Ment1 = CarNo;
+                                else if(NoDriving.Ment2 == "차량번호")
+                                    Ment2 = CarNo;
+                                if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use))) {
+                                    NetDev.SendMsg(Ment1, clsFunction.GetColor8Int(NoDriving.Color1), Ment2, clsFunction.GetColor8Int(NoDriving.Color2));
+                                } else {
+                                    SerialDev.DisPlayMent(CamIdx, Ment1, NoDriving.Color1, Ment2, NoDriving.Color2);
+                                }
+                            }
+                        }
+                        Rtn += "부제 체크 해당";
+                        blNoDriving = true;
                         // Exception : 정기차량 전체 부제 제외 (정기권 있으면 통과)
                         if(!NoDriving.Exception && !blNoDrivingException2)
                             return Rtn;
