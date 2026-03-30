@@ -1,0 +1,35 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# 설정 파일 (IP, 포트 등 현장 정보 포함)
+CameraSetting.ini
+
+# 빌드된 실행파일
+*.exe
+*.dll
+*.pdb
+
+# Windows 임시 파일
+Thumbs.db
+Desktop.ini
