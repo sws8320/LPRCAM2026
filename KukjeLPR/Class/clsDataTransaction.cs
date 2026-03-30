@@ -428,7 +428,9 @@ namespace KyungsinLPR {
                         }
                         Rtn += "부제 체크 해당";
                         blNoDriving = true;
-                        if(!NoDriving.Exception)
+                        // Exception : 정기차량 전체 부제 제외 (정기권 있으면 통과)
+                        // Exception2: 미적용차량 부제 제외 (미등록 일반 차량도 통과)
+                        if(!NoDriving.Exception && !NoDriving.Exception2)
                             return Rtn;
                     }
                 }
@@ -589,7 +591,8 @@ namespace KyungsinLPR {
                     }
                 }
 
-                if(Type.Equals((int)ClsStructure.InoutType.입구용) && blNoDriving && NoDriving.Exception && !RegedCar[CamIdx] && !blNoDriving_Ent)
+                // 정기차량 전체 부제 제외: 정기권 없으면 차단
+                if(Type.Equals((int)ClsStructure.InoutType.입구용) && blNoDriving && NoDriving.Exception && !NoDriving.Exception2 && !RegedCar[CamIdx] && !blNoDriving_Ent)
                     return Rtn;
 
                 //HomeLan Relay

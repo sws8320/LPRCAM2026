@@ -18,6 +18,8 @@ namespace KyungsinLPR
         public static bool DisPlay;
         //부제 예외 차량 (정기권 있으면 부제 무시)
         public static bool Exception;
+        //부제 미적용 차량 제외 (미등록 일반 차량도 부제 면제)
+        public static bool Exception2;
         //전광판 문구1
         public static string Ment1;
         //전광판 문구1 색상
@@ -34,6 +36,7 @@ namespace KyungsinLPR
             WriteLpr = Util.Function.BoolTryParse(Util.Function.IniReadValue("NODRIVE", "WriteLpr"));
             DisPlay = Util.Function.BoolTryParse(Util.Function.IniReadValue("NODRIVE", "DisPlay"));
             Exception = Util.Function.BoolTryParse(Util.Function.IniReadValue("NODRIVE", "Exception"));
+            Exception2 = Util.Function.BoolTryParse(Util.Function.IniReadValue("NODRIVE", "Exception2"));
             Ment1 = Util.Function.IniReadValue("NODRIVE", "Ment1");
             Color1 = Util.Function.IniReadValue("NODRIVE", "Color1");
             Ment2 = Util.Function.IniReadValue("NODRIVE", "Ment2");
@@ -47,6 +50,7 @@ namespace KyungsinLPR
             Util.Function.IniWriteValue("NODRIVE", "WriteLpr", WriteLpr);
             Util.Function.IniWriteValue("NODRIVE", "DisPlay", DisPlay);
             Util.Function.IniWriteValue("NODRIVE", "Exception", Exception);
+            Util.Function.IniWriteValue("NODRIVE", "Exception2", Exception2);
             Util.Function.IniWriteValue("NODRIVE", "Ment1", Ment1);   // 수정: MENT1 → Ment1 통일
             Util.Function.IniWriteValue("NODRIVE", "Color1", Color1);
             Util.Function.IniWriteValue("NODRIVE", "Ment2", Ment2);

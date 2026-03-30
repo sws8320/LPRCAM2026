@@ -202,6 +202,7 @@ namespace KyungsinLPR
             chkNoDrivingLpr.Checked = NoDriving.WriteLpr;
             chkNoDrivingDisPlay.Checked = NoDriving.DisPlay;
             chkNoDrivingException.Checked = NoDriving.Exception;
+            checkBox1.Checked = NoDriving.Exception2;
             txtNoDriveMent1.Text = NoDriving.Ment1;
             txtNoDriveMent2.Text = NoDriving.Ment2;
             if (env.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name == ClsStructure.DisPlayType.Color8.ToString())
@@ -1315,6 +1316,7 @@ namespace KyungsinLPR
             NoDriving.WriteLpr = chkNoDrivingLpr.Checked;
             NoDriving.DisPlay = chkNoDrivingDisPlay.Checked;
             NoDriving.Exception = chkNoDrivingException.Checked;
+            NoDriving.Exception2 = checkBox1.Checked;
             NoDriving.Ment1 = txtNoDriveMent1.Text;
             NoDriving.Ment2 = txtNoDriveMent2.Text;
             NoDriving.Color1 = cmbNoDriveColor1.Text;
