@@ -433,6 +433,24 @@ namespace KyungsinLPR {
                                 } else {
                                     SerialDev.DisPlayMent(CamIdx, Ment1, NoDriving.Color1, Ment2, NoDriving.Color2);
                                 }
+                                // 3초 후 기본문구로 복귀
+                                int _camIdx = CamIdx;
+                                bool _netUse0 = Env.CommunicationEnv.DisPlay[0].Net.Use;
+                                bool _netUse1 = Env.CommunicationEnv.DisPlay[1].Net.Use;
+                                System.Threading.Tasks.Task.Run(async () => {
+                                    await System.Threading.Tasks.Task.Delay(3000);
+                                    if(_camIdx == 0) {
+                                        if(_netUse0 && frmLprMain.NetDisPlay1 != null)
+                                            frmLprMain.NetDisPlay1.DisPlayTime = DateTime.MinValue;
+                                        else if(frmLprMain.FirstDisPlayReturn != null)
+                                            frmLprMain.FirstDisPlayReturn.DisPlayTime = DateTime.MinValue;
+                                    } else {
+                                        if(_netUse1 && frmLprMain.NetDisPlay2 != null)
+                                            frmLprMain.NetDisPlay2.DisPlayTime = DateTime.MinValue;
+                                        else if(frmLprMain.SecondDisPlayReturn != null)
+                                            frmLprMain.SecondDisPlayReturn.DisPlayTime = DateTime.MinValue;
+                                    }
+                                });
                             }
                         }
                         Rtn += "부제 체크 해당";
