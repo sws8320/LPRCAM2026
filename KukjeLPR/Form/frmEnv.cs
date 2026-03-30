@@ -195,6 +195,9 @@ namespace KyungsinLPR
                 case NoDrive.Type10:
                     rdbNoDriving10.Checked = true;
                     break;
+                case NoDrive.TypeDayOfWeek:
+                    rdbNoDriving67.Checked = true;
+                    break;
             }
             chkNoDrivingLpr.Checked = NoDriving.WriteLpr;
             chkNoDrivingDisPlay.Checked = NoDriving.DisPlay;
@@ -1307,6 +1310,8 @@ namespace KyungsinLPR
                 NoDriving.Option = NoDrive.Type5;
             else if (rdbNoDriving10.Checked)
                 NoDriving.Option = NoDrive.Type10;
+            else if (rdbNoDriving67.Checked)
+                NoDriving.Option = NoDrive.TypeDayOfWeek;
             NoDriving.WriteLpr = chkNoDrivingLpr.Checked;
             NoDriving.DisPlay = chkNoDrivingDisPlay.Checked;
             NoDriving.Exception = chkNoDrivingException.Checked;
