@@ -428,27 +428,29 @@ namespace KyungsinLPR {
                                     Ment1 = CarNo;
                                 else if(NoDriving.Ment2 == "차량번호")
                                     Ment2 = CarNo;
-                                if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use))) {
+                                bool _isNet = NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use));
+                                if(_isNet) {
                                     NetDev.SendMsg(Ment1, clsFunction.GetColor8Int(NoDriving.Color1), Ment2, clsFunction.GetColor8Int(NoDriving.Color2));
                                 } else {
                                     SerialDev.DisPlayMent(CamIdx, Ment1, NoDriving.Color1, Ment2, NoDriving.Color2);
                                 }
-                                // 3초 후 기본문구로 복귀
+                                // 3초 후 기본문구 직접 출력
                                 int _camIdx = CamIdx;
-                                bool _netUse0 = Env.CommunicationEnv.DisPlay[0].Net.Use;
-                                bool _netUse1 = Env.CommunicationEnv.DisPlay[1].Net.Use;
+                                string _defMent1 = Env.CommunicationEnv.DisPlay[CamIdx].Ment.Ment1Line;
+                                string _defMent2 = Env.CommunicationEnv.DisPlay[CamIdx].Ment.Ment2Line;
+                                string _defColor1 = Env.CommunicationEnv.DisPlay[CamIdx].Ment.Ment1Color;
+                                string _defColor2 = Env.CommunicationEnv.DisPlay[CamIdx].Ment.Ment2Color;
+                                var _netDev = NetDev;
+                                var _serialDev = SerialDev;
                                 System.Threading.Tasks.Task.Run(async () => {
                                     await System.Threading.Tasks.Task.Delay(3000);
-                                    if(_camIdx == 0) {
-                                        if(_netUse0 && frmLprMain.NetDisPlay1 != null)
-                                            frmLprMain.NetDisPlay1.DisPlayTime = DateTime.MinValue;
-                                        else if(frmLprMain.FirstDisPlayReturn != null)
-                                            frmLprMain.FirstDisPlayReturn.DisPlayTime = DateTime.MinValue;
-                                    } else {
-                                        if(_netUse1 && frmLprMain.NetDisPlay2 != null)
-                                            frmLprMain.NetDisPlay2.DisPlayTime = DateTime.MinValue;
-                                        else if(frmLprMain.SecondDisPlayReturn != null)
-                                            frmLprMain.SecondDisPlayReturn.DisPlayTime = DateTime.MinValue;
+                                    try {
+                                        if(_isNet && _netDev != null)
+                                            _netDev.SendMsg(_defMent1, clsFunction.GetColor8Int(_defColor1), _defMent2, clsFunction.GetColor8Int(_defColor2));
+                                        else if(_serialDev != null)
+                                            _serialDev.DisPlayMent(_camIdx, _defMent1, _defColor1, _defMent2, _defColor2);
+                                    } catch(Exception ex) {
+                                        Util.Logger.Log("부제 전광판 기본문구 복귀 오류: " + ex.Message);
                                     }
                                 });
                             }
