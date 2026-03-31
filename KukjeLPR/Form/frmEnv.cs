@@ -111,6 +111,7 @@ namespace KyungsinLPR
             ssdpSession.SetupSSDPSessions();
             ssdpSession.IpUpdated += IpUpdated;
             CarRegTypeGridInit();
+            InitVideoModeControls();
             setEnv();
             gbAuthentication.Visible = !env.CommonEnv.Authentication;
             for (int i = 1; i <= 10; i++)
@@ -134,7 +135,6 @@ namespace KyungsinLPR
             chkBusinessExitGateOpen.Checked = clsBusinessCar.UseExitGateOpen;
             chkBusinessExitSendData.Checked = clsBusinessCar.UseExitSocketDataSend;
             txtBusinessDisplayMent.Text = clsBusinessCar.DisPlayLineMent;
-            InitVideoModeControls();
         }
 
         private void InitVideoModeControls()
