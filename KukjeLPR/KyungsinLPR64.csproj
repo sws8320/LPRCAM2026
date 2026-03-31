@@ -195,6 +195,7 @@
     <EmbeddedResource Include="Class\iNova2\frmAdvFeature.resx">
       <DependentUpon>frmAdvFeature.cs</DependentUpon>
       <SubType>Designer</SubType>
+      <LogicalName>KyungsinLPR.iNova2.frmAdvFeature.resources</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="Form\frmExposureCheck.resx">
       <DependentUpon>frmExposureCheck.cs</DependentUpon>
