@@ -69,6 +69,7 @@ namespace KyungsinLPR
             public int CoreCountry;
             public bool bRegCarType;
             public List<SmallCarRate> RegCarRate;
+            public int RecogMode; // 0=스트로브(SSEngine), 1=동영상(FAVEngine)
         }
 
         public struct IPCamera_Basic_Setting
@@ -90,6 +91,7 @@ namespace KyungsinLPR
             public double FrameRate;
             public int TriggerMode;
             public bool SendStxEtx;
+            public string RtspUrl; // FAVEngine 동영상 방식용 RTSP URL
         }
 
         public struct IPCamera_Info

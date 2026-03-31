@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Drawing;
+using System.IO;
 using System.Text;
 using System.Threading;
 using Evo;
@@ -1010,6 +1011,162 @@ namespace KyungsinLPR {
                 //leess 6.x 모듈변경
                 //Evo.SSEngine.FreeHandle(ref handSSE[i]);
                 Evo.SSEngine.Deinit(handSSE[i]);
+            }
+        }
+
+        // ──────────────────────────────────────────────────
+        // FAVEngine (동영상 방식) 지원
+        // ──────────────────────────────────────────────────
+
+        private static IntPtr[] handFAVE = new IntPtr[2] { IntPtr.Zero, IntPtr.Zero };
+        private static Thread[] faveThreads = new Thread[2];
+        private static volatile bool[] faveRunning = new bool[2] { false, false };
+
+        /// <summary>
+        /// 지정된 카메라 채널에 FAVEngine을 초기화하고 백그라운드 스레드를 시작합니다.
+        /// </summary>
+        public static bool InitFAVE(int camIdx, string rtspUrl) {
+            if(string.IsNullOrEmpty(rtspUrl)) {
+                Util.Logger.Log(string.Format("FAVEngine CAM{0}: RTSP URL 없음, 동영상 방식 불가", camIdx + 1));
+                return false;
+            }
+            string language = (cc == THA) ? "THA" : "KOR";
+            try {
+                handFAVE[camIdx] = Evo.FAVEngine.Create();
+                if(handFAVE[camIdx] == IntPtr.Zero) {
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} Create() 실패 rc={1}", camIdx + 1, Evo.Func.GetLastRC()));
+                    return false;
+                }
+                int frc = Evo.FAVEngine.Init(handFAVE[camIdx], language, null, rtspUrl);
+                if(frc != 0) {
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} Init() 실패 rc={1}", camIdx + 1, frc));
+                    Evo.FAVEngine.Destroy(ref handFAVE[camIdx]);
+                    return false;
+                }
+                faveRunning[camIdx] = true;
+                int capturedIdx = camIdx;
+                faveThreads[camIdx] = new Thread(() => RunFAVELoop(capturedIdx));
+                faveThreads[camIdx].IsBackground = true;
+                faveThreads[camIdx].Start();
+                Util.Logger.Log(string.Format("FAVEngine CAM{0} 시작 URL={1}", camIdx + 1, rtspUrl));
+                return true;
+            } catch(Exception ex) {
+                Util.Logger.Log(string.Format("FAVEngine CAM{0} InitFAVE 예외: {1}", camIdx + 1, ex.Message));
+                return false;
+            }
+        }
+
+        private static void RunFAVELoop(int camIdx) {
+            IntPtr hFAVE = handFAVE[camIdx];
+            Util.Logger.Log(string.Format("FAVEngine CAM{0} 루프 시작", camIdx + 1));
+            while(faveRunning[camIdx]) {
+                IntPtr ctxGOP = IntPtr.Zero;
+                IntPtr ctxLPI = IntPtr.Zero;
+                try {
+                    ctxLPI = Evo.FAVEngine.PopLPI(hFAVE, ref ctxGOP);
+                    if(ctxLPI == IntPtr.Zero) {
+                        // 스트림 종료 또는 Deinit 호출
+                        Util.Logger.Log(string.Format("FAVEngine CAM{0} PopLPI 반환 NULL rc={1}", camIdx + 1, Evo.Func.GetLastRC()));
+                        break;
+                    }
+
+                    // 번호판 문자열 획득
+                    uint num = 0;
+                    int lrc = Evo.LPI.GetNumber(ctxLPI, out num);
+                    string plateNo = "No_Detection";
+                    if(lrc == 0 && num > 0) {
+                        StringBuilder strBuf = new StringBuilder(512);
+                        lrc = Evo.LPI.GetString(ctxLPI, 0, strBuf);
+                        if(lrc == 0 && strBuf.Length > 0)
+                            plateNo = strBuf.ToString();
+                    }
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} 인식 결과: {1}", camIdx + 1, plateNo));
+
+                    // GOP 이미지 저장
+                    string imgPath = SaveFAVEImage(camIdx, ctxGOP);
+
+                    // RegArray 채우고 후처리 호출
+                    string captureTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+                    ClsStructure.RegStruct[] regArr = (camIdx == 0) ? clsThread.RegArray1 : clsThread.RegArray2;
+                    for(int j = 0; j < regArr.Length; j++) {
+                        regArr[j].PlateNo = plateNo;
+                        regArr[j].SourcePath = imgPath;
+                        regArr[j].FirstCaptureTime = captureTime;
+                        regArr[j].CapCnt = j;
+                        regArr[j].term = 0;
+                        regArr[j].CarType = "";
+                    }
+                    if(camIdx == 0)
+                        clsThread.RegArray1 = regArr;
+                    else
+                        clsThread.RegArray2 = regArr;
+
+                    int ci = camIdx;
+                    Thread th = new Thread(() => clsThread.AfterRegPlateCam(ci, frmLprMain.ENV));
+                    th.IsBackground = true;
+                    th.Start();
+                } catch(Exception ex) {
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} RunFAVELoop 예외: {1}", camIdx + 1, ex.Message));
+                } finally {
+                    if(ctxGOP != IntPtr.Zero)
+                        Evo.FAVEngine.FreeGOP(hFAVE, ref ctxGOP);
+                    if(ctxLPI != IntPtr.Zero)
+                        Evo.Engine.FreeLPI(hFAVE, ref ctxLPI);
+                }
+            }
+            Util.Logger.Log(string.Format("FAVEngine CAM{0} 루프 종료", camIdx + 1));
+        }
+
+        private static string SaveFAVEImage(int camIdx, IntPtr ctxGOP) {
+            if(ctxGOP == IntPtr.Zero) return "";
+            try {
+                string basePath = frmLprMain.ENV.CameraEnv.ImageSave.SavePath;
+                if(string.IsNullOrEmpty(basePath)) return "";
+                string dateDir = System.IO.Path.Combine(basePath, DateTime.Now.ToString("yyyyMMdd"));
+                if(!System.IO.Directory.Exists(dateDir))
+                    System.IO.Directory.CreateDirectory(dateDir);
+                string chName = (camIdx == 0)
+                    ? frmLprMain.ENV.CameraEnv.IPCamera1Info.ChName
+                    : frmLprMain.ENV.CameraEnv.IPCamera2Info.ChName;
+                string fname = string.Format("{0}_{1}.jpg", chName, DateTime.Now.ToString("yyyyMMddHHmmssfff"));
+                string fullPath = System.IO.Path.Combine(dateDir, fname);
+
+                // EvoGOP_SaveInJPEG는 ASCII 경로만 지원
+                bool hasNonAscii = false;
+                foreach(char c in fullPath) { if(c > 127) { hasNonAscii = true; break; } }
+                if(hasNonAscii) {
+                    // 임시 ASCII 경로에 저장 후 이동
+                    string tmpPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), fname);
+                    int grc = Evo.GOP.SaveInJPEG(ctxGOP, 0, tmpPath, 95);
+                    if(grc == 0 && System.IO.File.Exists(tmpPath))
+                        System.IO.File.Move(tmpPath, fullPath);
+                } else {
+                    Evo.GOP.SaveInJPEG(ctxGOP, 0, fullPath, 95);
+                }
+                return fullPath;
+            } catch(Exception ex) {
+                Util.Logger.Log(string.Format("FAVEngine CAM{0} SaveFAVEImage 예외: {1}", camIdx + 1, ex.Message));
+                return "";
+            }
+        }
+
+        /// <summary>
+        /// 모든 채널의 FAVEngine을 정지하고 리소스를 해제합니다.
+        /// </summary>
+        public static void ReleaseFAVE() {
+            for(int i = 0; i < 2; i++) {
+                if(handFAVE[i] == IntPtr.Zero) continue;
+                faveRunning[i] = false;
+                try {
+                    Evo.FAVEngine.Deinit(handFAVE[i]); // PopLPI 블로킹 해제
+                    if(faveThreads[i] != null && faveThreads[i].IsAlive)
+                        faveThreads[i].Join(3000);
+                    Evo.FAVEngine.Destroy(ref handFAVE[i]);
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} 해제 완료", i + 1));
+                } catch(Exception ex) {
+                    Util.Logger.Log(string.Format("FAVEngine CAM{0} ReleaseFAVE 예외: {1}", i + 1, ex.Message));
+                    handFAVE[i] = IntPtr.Zero;
+                }
             }
         }
     }

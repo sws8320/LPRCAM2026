@@ -271,8 +271,9 @@ namespace KyungsinLPR
                                         clsThread.RegPlateNoElwox(0, CapCnt);
                                 } else {
 #if WIN64
-                                    //CoreLogic
-                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
+                                    //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
+                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
+                                        && ENV.CameraEnv.RecogMode == 0)
                                         CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                                 }
@@ -437,8 +438,9 @@ namespace KyungsinLPR
                                         clsThread.RegPlateNoElwox(0, CapCnt);
                                 } else {
 #if WIN64
-                                    //CoreLogic
-                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
+                                    //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
+                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
+                                        && ENV.CameraEnv.RecogMode == 0)
                                         CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                                 }
@@ -601,8 +603,9 @@ namespace KyungsinLPR
                                 clsThread.RegPlateNoNgisWay(1, CapCnt);
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.Elwox)
                                 clsThread.RegPlateNoElwox(1, CapCnt);
-                            //CoreLogic
-                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic) {
+                            //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
+                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
+                                && ENV.CameraEnv.RecogMode == 0) {
 #if WIN64
                                 CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
@@ -773,8 +776,9 @@ namespace KyungsinLPR
                                 clsThread.RegPlateNoNgisWay(1, CapCnt);
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.Elwox)
                                 clsThread.RegPlateNoElwox(1, CapCnt);
-                            //CoreLogic
-                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic) {
+                            //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
+                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
+                                && ENV.CameraEnv.RecogMode == 0) {
 #if WIN64
                                 CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
@@ -1178,20 +1182,29 @@ namespace KyungsinLPR
                                     if(IntPtr.Size == 8) {
                                         Util.Logger.Log("IntPtr 8");
                                         try {
-                                            Util.Logger.Log("core init");
-                                            thCoreInit = new Thread(delegate () {
-                                                CoreLogic.Initialize();
-                                            });
+                                            if(ENV.CameraEnv.RecogMode == 1) {
+                                                // 동영상 방식(FAVEngine)
+                                                Util.Logger.Log("FAVEngine 동영상 방식 시작");
+                                                thCoreInit = new Thread(delegate () {
+                                                    CoreLogic.Initialize();
+                                                    if(ENV.CameraEnv.IPCamera1Info.Use)
+                                                        CoreLogic.InitFAVE(0, ENV.CameraEnv.IPCamera1Info.RtspUrl);
+                                                    if(ENV.CameraEnv.IPCamera2Info.Use)
+                                                        CoreLogic.InitFAVE(1, ENV.CameraEnv.IPCamera2Info.RtspUrl);
+                                                });
+                                            } else {
+                                                // 스트로브 방식(SSEngine) - 기존
+                                                Util.Logger.Log("core init");
+                                                thCoreInit = new Thread(delegate () {
+                                                    CoreLogic.Initialize();
+                                                });
+                                            }
                                             thCoreInit.IsBackground = true;
                                             thCoreInit.Start();
                                             timer_Core.Enabled = true;
                                             grpCoreInit.Visible = true;
                                             if(!ENV.CameraEnv.IPCamera2Info.Use)
                                                 grpCoreInit.Left = (510 - grpCoreInit.Width) / 2;
-                                            //if (!CoreLogic.Init())
-                                            //{
-                                            //    MessageBox.Show("인식 모듈 초기화 실패!!!");
-                                            //}
                                         } catch(Exception ex) { }
                                     } else {
                                         Util.Logger.Log("64bit process가 아닙니다.");
@@ -3424,6 +3437,10 @@ namespace KyungsinLPR
             {
                 m_keepGrab1 = false;
                 m_keepGrab2 = false;
+#if WIN64
+                if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic && ENV.CameraEnv.RecogMode == 1)
+                    CoreLogic.ReleaseFAVE();
+#endif
                 if (ENV.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color8.ToString()))
                 {
                     if (NetDisPlay1 != null && ENV.CommunicationEnv.DisPlay[1].Net.Use)

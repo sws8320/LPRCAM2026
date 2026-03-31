@@ -17,9 +17,14 @@ namespace KyungsinLPR
 {
     public partial class frmEnv : Form
     {
-        public ClsStructure.EnvStruct env;        
+        public ClsStructure.EnvStruct env;
         private IPCamera Cam1;
         private IPCamera Cam2;
+
+        // 동영상 인식 방식 UI 컨트롤 (프로그래밍 방식으로 추가)
+        private System.Windows.Forms.ComboBox cmbRecogMode;
+        private System.Windows.Forms.TextBox txtRtsp1;
+        private System.Windows.Forms.TextBox txtRtsp2;
         //leess iNova2추가
         private iNova2.IPCamera Cam1_iNova2;
         private iNova2.IPCamera Cam2_iNova2;
@@ -129,6 +134,50 @@ namespace KyungsinLPR
             chkBusinessExitGateOpen.Checked = clsBusinessCar.UseExitGateOpen;
             chkBusinessExitSendData.Checked = clsBusinessCar.UseExitSocketDataSend;
             txtBusinessDisplayMent.Text = clsBusinessCar.DisPlayLineMent;
+            InitVideoModeControls();
+        }
+
+        private void InitVideoModeControls()
+        {
+            // groupBox8 에 동영상 인식 방식 설정 컨트롤을 동적으로 추가
+            groupBox8.Height = 370;
+
+            var lblRecogMode = new System.Windows.Forms.Label();
+            lblRecogMode.Text = "인식 방식:";
+            lblRecogMode.Location = new System.Drawing.Point(6, 289);
+            lblRecogMode.Size = new System.Drawing.Size(65, 17);
+            groupBox8.Controls.Add(lblRecogMode);
+
+            cmbRecogMode = new System.Windows.Forms.ComboBox();
+            cmbRecogMode.Items.Add("스트로브 방식");
+            cmbRecogMode.Items.Add("동영상 방식(FAVEngine)");
+            cmbRecogMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            cmbRecogMode.SelectedIndex = 0;
+            cmbRecogMode.Location = new System.Drawing.Point(75, 286);
+            cmbRecogMode.Size = new System.Drawing.Size(185, 21);
+            groupBox8.Controls.Add(cmbRecogMode);
+
+            var lblRtsp1 = new System.Windows.Forms.Label();
+            lblRtsp1.Text = "CAM1 RTSP:";
+            lblRtsp1.Location = new System.Drawing.Point(6, 314);
+            lblRtsp1.Size = new System.Drawing.Size(72, 17);
+            groupBox8.Controls.Add(lblRtsp1);
+
+            txtRtsp1 = new System.Windows.Forms.TextBox();
+            txtRtsp1.Location = new System.Drawing.Point(82, 311);
+            txtRtsp1.Size = new System.Drawing.Size(180, 21);
+            groupBox8.Controls.Add(txtRtsp1);
+
+            var lblRtsp2 = new System.Windows.Forms.Label();
+            lblRtsp2.Text = "CAM2 RTSP:";
+            lblRtsp2.Location = new System.Drawing.Point(6, 339);
+            lblRtsp2.Size = new System.Drawing.Size(72, 17);
+            groupBox8.Controls.Add(lblRtsp2);
+
+            txtRtsp2 = new System.Windows.Forms.TextBox();
+            txtRtsp2.Location = new System.Drawing.Point(82, 336);
+            txtRtsp2.Size = new System.Drawing.Size(180, 21);
+            groupBox8.Controls.Add(txtRtsp2);
         }
 
         private void setEnv()
@@ -271,6 +320,14 @@ namespace KyungsinLPR
                 rdbTha.Checked = true;
 
             chkRegCarType.Checked = env.CameraEnv.bRegCarType;
+
+            // 동영상 인식 방식 설정 로드
+            if (cmbRecogMode != null)
+            {
+                cmbRecogMode.SelectedIndex = (env.CameraEnv.RecogMode == 1) ? 1 : 0;
+                txtRtsp1.Text = env.CameraEnv.IPCamera1Info.RtspUrl ?? "";
+                txtRtsp2.Text = env.CameraEnv.IPCamera2Info.RtspUrl ?? "";
+            }
 
             foreach (ClsStructure.SmallCarRate item in env.CameraEnv.RegCarRate)
             {
@@ -1573,6 +1630,14 @@ namespace KyungsinLPR
                 env.CameraEnv.RegModule = (int)ClsStructure.RegModule.Ngis;
             else if (rdbCore.Checked)
                 env.CameraEnv.RegModule = (int)ClsStructure.RegModule.CoreLogic;
+
+            // 동영상 인식 방식 설정 저장
+            if (cmbRecogMode != null)
+            {
+                env.CameraEnv.RecogMode = cmbRecogMode.SelectedIndex;
+                env.CameraEnv.IPCamera1Info.RtspUrl = txtRtsp1.Text;
+                env.CameraEnv.IPCamera2Info.RtspUrl = txtRtsp2.Text;
+            }
 
             if (rdbCpu.Checked)
                 env.CameraEnv.CoreType = (int)ClsStructure.CoreType.CPU;

@@ -70,6 +70,7 @@ namespace KyungsinLPR
             #region Camera1
             EnvInfo.CameraEnv.IPCamera1Info.Use = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam1useflag"));
             EnvInfo.CameraEnv.IPCamera1Info.IP = ReadIni("CAMERA", "cam1ip");
+            EnvInfo.CameraEnv.IPCamera1Info.RtspUrl = ReadIni("CAMERA", "cam1rtspurl");
             EnvInfo.CameraEnv.IPCamera1Info.ChName = ReadIni("CAMERA", "cam1chname");
             EnvInfo.CameraEnv.IPCamera1Info.StreamUdp = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam1udp"));
             //EnvInfo.CameraEnv.IPCamera1Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM1", "etcsave"));
@@ -139,6 +140,7 @@ namespace KyungsinLPR
             #region Camera2
             EnvInfo.CameraEnv.IPCamera2Info.Use = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam2useflag"));
             EnvInfo.CameraEnv.IPCamera2Info.IP = ReadIni("CAMERA", "cam2ip");
+            EnvInfo.CameraEnv.IPCamera2Info.RtspUrl = ReadIni("CAMERA", "cam2rtspurl");
             EnvInfo.CameraEnv.IPCamera2Info.ChName = ReadIni("CAMERA", "cam2chname");
             EnvInfo.CameraEnv.IPCamera2Info.StreamUdp = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam2udp"));
             //EnvInfo.CameraEnv.IPCamera2Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM2", "etcsave"));
@@ -217,6 +219,7 @@ namespace KyungsinLPR
             int.TryParse(Util.Function.IniReadValue("CAMERA", "regmodule"), out EnvInfo.CameraEnv.RegModule);
             int.TryParse(Util.Function.IniReadValue("CAMERA", "regtype"), out EnvInfo.CameraEnv.CoreType);
             int.TryParse(Util.Function.IniReadValue("CAMERA", "regcountrytype"), out EnvInfo.CameraEnv.CoreCountry);
+            int.TryParse(Util.Function.IniReadValue("CAMERA", "recogmode"), out EnvInfo.CameraEnv.RecogMode);
             if (EnvInfo.CameraEnv.CoreCountry <= 0)
                 EnvInfo.CameraEnv.CoreCountry = CoreLogic.KOR;
             CoreLogic.cc = EnvInfo.CameraEnv.CoreCountry;
@@ -510,6 +513,7 @@ namespace KyungsinLPR
             #region Camera1
             WriteIni("CAMERA", "cam1useflag", env.CameraEnv.IPCamera1Info.Use);
             WriteIni("CAMERA", "cam1ip", env.CameraEnv.IPCamera1Info.IP);
+            WriteIni("CAMERA", "cam1rtspurl", env.CameraEnv.IPCamera1Info.RtspUrl ?? "");
             WriteIni("CAMERA", "cam1chname", env.CameraEnv.IPCamera1Info.ChName);
             WriteIni("CAMERA", "cam1udp", env.CameraEnv.IPCamera1Info.StreamUdp);
             //WriteIni("IPCAM1", "etcsave", env.CameraEnv.IPCamera1Info.ImageSave.EtcSave);
@@ -567,6 +571,7 @@ namespace KyungsinLPR
             #region Camera2
             WriteIni("CAMERA", "cam2useflag", env.CameraEnv.IPCamera2Info.Use);
             WriteIni("CAMERA", "cam2ip", env.CameraEnv.IPCamera2Info.IP);
+            WriteIni("CAMERA", "cam2rtspurl", env.CameraEnv.IPCamera2Info.RtspUrl ?? "");
             WriteIni("CAMERA", "cam2chname", env.CameraEnv.IPCamera2Info.ChName);
             WriteIni("CAMERA", "cam2udp", env.CameraEnv.IPCamera2Info.StreamUdp);
             //WriteIni("IPCAM2", "etcsave", env.CameraEnv.IPCamera2Info.ImageSave.EtcSave);
@@ -636,6 +641,7 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "regtype", env.CameraEnv.CoreType);
             WriteIni("CAMERA", "regcountrytype", env.CameraEnv.CoreCountry);
             WriteIni("CAMERA", "regcartype", env.CameraEnv.bRegCarType);
+            WriteIni("CAMERA", "recogmode", env.CameraEnv.RecogMode);
 
             string tmp = "";
             foreach (ClsStructure.SmallCarRate item in env.CameraEnv.RegCarRate)
