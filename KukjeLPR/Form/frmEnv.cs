@@ -140,8 +140,6 @@ namespace KyungsinLPR
         private void InitVideoModeControls()
         {
             // groupBox8 에 동영상 인식 방식 설정 컨트롤을 동적으로 추가
-            groupBox8.Height = 370;
-
             var lblRecogMode = new System.Windows.Forms.Label();
             lblRecogMode.Text = "인식 방식:";
             lblRecogMode.Location = new System.Drawing.Point(6, 289);

@@ -1063,7 +1063,7 @@ namespace KyungsinLPR {
                 IntPtr ctxGOP = IntPtr.Zero;
                 IntPtr ctxLPI = IntPtr.Zero;
                 try {
-                    ctxLPI = Evo.FAVEngine.PopLPI(hFAVE, ref ctxGOP);
+                    ctxLPI = Evo.FAVEngine.PopLPI(hFAVE, out ctxGOP);
                     if(ctxLPI == IntPtr.Zero) {
                         // 스트림 종료 또는 Deinit 호출
                         Util.Logger.Log(string.Format("FAVEngine CAM{0} PopLPI 반환 NULL rc={1}", camIdx + 1, Evo.Func.GetLastRC()));

@@ -32,13 +32,16 @@
             this.btnEnvSave = new System.Windows.Forms.Button();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabBaisc = new System.Windows.Forms.TabPage();
+            this.btnStayCommit = new System.Windows.Forms.Button();
+            this.txtStay = new System.Windows.Forms.TextBox();
+            this.label159 = new System.Windows.Forms.Label();
             this.checkEmergencyCar = new System.Windows.Forms.CheckBox();
-            this.chkGetMst = new System.Windows.Forms.CheckBox();
             this.groupBox29 = new System.Windows.Forms.GroupBox();
             this.txtGetMstTerm = new System.Windows.Forms.TextBox();
             this.label143 = new System.Windows.Forms.Label();
             this.button7 = new System.Windows.Forms.Button();
             this.txtGetMstPath = new System.Windows.Forms.TextBox();
+            this.chkGetMst = new System.Windows.Forms.CheckBox();
             this.grpFullControl = new System.Windows.Forms.GroupBox();
             this.chkFullReaseGateOpen = new System.Windows.Forms.CheckBox();
             this.chkFullPeriodControl = new System.Windows.Forms.CheckBox();
@@ -642,9 +645,6 @@
             this.txtEntLimitMent = new System.Windows.Forms.TextBox();
             this.label148 = new System.Windows.Forms.Label();
             this.button5 = new System.Windows.Forms.Button();
-            this.label159 = new System.Windows.Forms.Label();
-            this.txtStay = new System.Windows.Forms.TextBox();
-            this.btnStayCommit = new System.Windows.Forms.Button();
             this.tabControl1.SuspendLayout();
             this.tabBaisc.SuspendLayout();
             this.groupBox29.SuspendLayout();
@@ -810,6 +810,33 @@
             this.tabBaisc.TabIndex = 5;
             this.tabBaisc.Text = "기본설정";
             // 
+            // btnStayCommit
+            // 
+            this.btnStayCommit.Location = new System.Drawing.Point(550, 260);
+            this.btnStayCommit.Name = "btnStayCommit";
+            this.btnStayCommit.Size = new System.Drawing.Size(60, 21);
+            this.btnStayCommit.TabIndex = 23;
+            this.btnStayCommit.Text = "저장";
+            this.btnStayCommit.UseVisualStyleBackColor = true;
+            this.btnStayCommit.Click += new System.EventHandler(this.btnStayCommit_Click);
+            // 
+            // txtStay
+            // 
+            this.txtStay.Location = new System.Drawing.Point(475, 260);
+            this.txtStay.MaxLength = 2;
+            this.txtStay.Name = "txtStay";
+            this.txtStay.Size = new System.Drawing.Size(69, 21);
+            this.txtStay.TabIndex = 9;
+            // 
+            // label159
+            // 
+            this.label159.AutoSize = true;
+            this.label159.Location = new System.Drawing.Point(473, 240);
+            this.label159.Name = "label159";
+            this.label159.Size = new System.Drawing.Size(81, 12);
+            this.label159.TabIndex = 23;
+            this.label159.Text = "현재 주차대수";
+            // 
             // checkEmergencyCar
             // 
             this.checkEmergencyCar.AutoSize = true;
@@ -819,16 +846,6 @@
             this.checkEmergencyCar.TabIndex = 147;
             this.checkEmergencyCar.Text = "긴급차량 개방(999, 998)";
             this.checkEmergencyCar.UseVisualStyleBackColor = true;
-            // 
-            // chkGetMst
-            // 
-            this.chkGetMst.AutoSize = true;
-            this.chkGetMst.Location = new System.Drawing.Point(113, 0);
-            this.chkGetMst.Name = "chkGetMst";
-            this.chkGetMst.Size = new System.Drawing.Size(15, 14);
-            this.chkGetMst.TabIndex = 0;
-            this.chkGetMst.UseVisualStyleBackColor = true;
-            this.chkGetMst.CheckedChanged += new System.EventHandler(this.CheckBox1_CheckedChanged);
             // 
             // groupBox29
             // 
@@ -878,6 +895,16 @@
             this.txtGetMstPath.Name = "txtGetMstPath";
             this.txtGetMstPath.Size = new System.Drawing.Size(245, 21);
             this.txtGetMstPath.TabIndex = 29;
+            // 
+            // chkGetMst
+            // 
+            this.chkGetMst.AutoSize = true;
+            this.chkGetMst.Location = new System.Drawing.Point(113, 0);
+            this.chkGetMst.Name = "chkGetMst";
+            this.chkGetMst.Size = new System.Drawing.Size(15, 14);
+            this.chkGetMst.TabIndex = 0;
+            this.chkGetMst.UseVisualStyleBackColor = true;
+            this.chkGetMst.CheckedChanged += new System.EventHandler(this.CheckBox1_CheckedChanged);
             // 
             // grpFullControl
             // 
@@ -3093,16 +3120,16 @@
             this.gbLPRInfo.Controls.Add(this.label65);
             this.gbLPRInfo.Controls.Add(this.label66);
             this.gbLPRInfo.Controls.Add(this.label67);
-            this.gbLPRInfo.Location = new System.Drawing.Point(6, 295);
+            this.gbLPRInfo.Location = new System.Drawing.Point(6, 341);
             this.gbLPRInfo.Name = "gbLPRInfo";
-            this.gbLPRInfo.Size = new System.Drawing.Size(569, 104);
+            this.gbLPRInfo.Size = new System.Drawing.Size(400, 104);
             this.gbLPRInfo.TabIndex = 137;
             this.gbLPRInfo.TabStop = false;
             this.gbLPRInfo.Text = "LPR 설정(통신)";
             // 
             // btnLPRInfoPath2
             // 
-            this.btnLPRInfoPath2.Location = new System.Drawing.Point(442, 68);
+            this.btnLPRInfoPath2.Location = new System.Drawing.Point(343, 68);
             this.btnLPRInfoPath2.Name = "btnLPRInfoPath2";
             this.btnLPRInfoPath2.Size = new System.Drawing.Size(42, 20);
             this.btnLPRInfoPath2.TabIndex = 27;
@@ -3112,7 +3139,7 @@
             // 
             // btnLPRInfoPath1
             // 
-            this.btnLPRInfoPath1.Location = new System.Drawing.Point(442, 39);
+            this.btnLPRInfoPath1.Location = new System.Drawing.Point(343, 39);
             this.btnLPRInfoPath1.Name = "btnLPRInfoPath1";
             this.btnLPRInfoPath1.Size = new System.Drawing.Size(42, 21);
             this.btnLPRInfoPath1.TabIndex = 26;
@@ -3122,52 +3149,52 @@
             // 
             // txtLPRInfoPath2
             // 
-            this.txtLPRInfoPath2.Location = new System.Drawing.Point(196, 69);
+            this.txtLPRInfoPath2.Location = new System.Drawing.Point(157, 69);
             this.txtLPRInfoPath2.Name = "txtLPRInfoPath2";
             this.txtLPRInfoPath2.ReadOnly = true;
-            this.txtLPRInfoPath2.Size = new System.Drawing.Size(240, 21);
+            this.txtLPRInfoPath2.Size = new System.Drawing.Size(180, 21);
             this.txtLPRInfoPath2.TabIndex = 24;
             // 
             // txtLPRInfoPath1
             // 
-            this.txtLPRInfoPath1.Location = new System.Drawing.Point(196, 40);
+            this.txtLPRInfoPath1.Location = new System.Drawing.Point(157, 40);
             this.txtLPRInfoPath1.Name = "txtLPRInfoPath1";
             this.txtLPRInfoPath1.ReadOnly = true;
-            this.txtLPRInfoPath1.Size = new System.Drawing.Size(240, 21);
+            this.txtLPRInfoPath1.Size = new System.Drawing.Size(180, 21);
             this.txtLPRInfoPath1.TabIndex = 23;
             // 
             // txtLPRInfoPort2
             // 
-            this.txtLPRInfoPort2.Location = new System.Drawing.Point(140, 69);
+            this.txtLPRInfoPort2.Location = new System.Drawing.Point(103, 69);
             this.txtLPRInfoPort2.Name = "txtLPRInfoPort2";
             this.txtLPRInfoPort2.Size = new System.Drawing.Size(50, 21);
             this.txtLPRInfoPort2.TabIndex = 21;
             // 
             // txtLPRInfoPort1
             // 
-            this.txtLPRInfoPort1.Location = new System.Drawing.Point(140, 40);
+            this.txtLPRInfoPort1.Location = new System.Drawing.Point(103, 40);
             this.txtLPRInfoPort1.Name = "txtLPRInfoPort1";
             this.txtLPRInfoPort1.Size = new System.Drawing.Size(50, 21);
             this.txtLPRInfoPort1.TabIndex = 20;
             // 
             // txtLPRInfoIP2
             // 
-            this.txtLPRInfoIP2.Location = new System.Drawing.Point(13, 69);
+            this.txtLPRInfoIP2.Location = new System.Drawing.Point(5, 69);
             this.txtLPRInfoIP2.Name = "txtLPRInfoIP2";
-            this.txtLPRInfoIP2.Size = new System.Drawing.Size(119, 21);
+            this.txtLPRInfoIP2.Size = new System.Drawing.Size(95, 21);
             this.txtLPRInfoIP2.TabIndex = 18;
             // 
             // txtLPRInfoIP1
             // 
-            this.txtLPRInfoIP1.Location = new System.Drawing.Point(13, 40);
+            this.txtLPRInfoIP1.Location = new System.Drawing.Point(5, 40);
             this.txtLPRInfoIP1.Name = "txtLPRInfoIP1";
-            this.txtLPRInfoIP1.Size = new System.Drawing.Size(119, 21);
+            this.txtLPRInfoIP1.Size = new System.Drawing.Size(95, 21);
             this.txtLPRInfoIP1.TabIndex = 17;
             // 
             // label65
             // 
             this.label65.AutoSize = true;
-            this.label65.Location = new System.Drawing.Point(210, 17);
+            this.label65.Location = new System.Drawing.Point(171, 17);
             this.label65.Name = "label65";
             this.label65.Size = new System.Drawing.Size(65, 12);
             this.label65.TabIndex = 5;
@@ -3176,7 +3203,7 @@
             // label66
             // 
             this.label66.AutoSize = true;
-            this.label66.Location = new System.Drawing.Point(138, 17);
+            this.label66.Location = new System.Drawing.Point(101, 17);
             this.label66.Name = "label66";
             this.label66.Size = new System.Drawing.Size(27, 12);
             this.label66.TabIndex = 4;
@@ -3451,7 +3478,7 @@
             this.gbAuthentication.Controls.Add(this.button1);
             this.gbAuthentication.Controls.Add(this.textBox1);
             this.gbAuthentication.Controls.Add(this.label43);
-            this.gbAuthentication.Location = new System.Drawing.Point(578, 317);
+            this.gbAuthentication.Location = new System.Drawing.Point(578, 378);
             this.gbAuthentication.Name = "gbAuthentication";
             this.gbAuthentication.Size = new System.Drawing.Size(163, 82);
             this.gbAuthentication.TabIndex = 135;
@@ -3497,7 +3524,7 @@
             this.groupBox8.Controls.Add(this.label17);
             this.groupBox8.Location = new System.Drawing.Point(412, 6);
             this.groupBox8.Name = "groupBox8";
-            this.groupBox8.Size = new System.Drawing.Size(272, 283);
+            this.groupBox8.Size = new System.Drawing.Size(272, 396);
             this.groupBox8.TabIndex = 134;
             this.groupBox8.TabStop = false;
             this.groupBox8.Text = "인식모듈 선택(CAM)";
@@ -7022,33 +7049,6 @@
             this.button5.Text = "닫기";
             this.button5.UseVisualStyleBackColor = true;
             this.button5.Click += new System.EventHandler(this.button5_Click);
-            // 
-            // label159
-            // 
-            this.label159.AutoSize = true;
-            this.label159.Location = new System.Drawing.Point(473, 240);
-            this.label159.Name = "label159";
-            this.label159.Size = new System.Drawing.Size(81, 12);
-            this.label159.TabIndex = 23;
-            this.label159.Text = "현재 주차대수";
-            // 
-            // txtStay
-            // 
-            this.txtStay.Location = new System.Drawing.Point(475, 260);
-            this.txtStay.MaxLength = 2;
-            this.txtStay.Name = "txtStay";
-            this.txtStay.Size = new System.Drawing.Size(69, 21);
-            this.txtStay.TabIndex = 9;
-            // 
-            // btnStayCommit
-            // 
-            this.btnStayCommit.Location = new System.Drawing.Point(550, 260);
-            this.btnStayCommit.Name = "btnStayCommit";
-            this.btnStayCommit.Size = new System.Drawing.Size(60, 21);
-            this.btnStayCommit.TabIndex = 23;
-            this.btnStayCommit.Text = "저장";
-            this.btnStayCommit.UseVisualStyleBackColor = true;
-            this.btnStayCommit.Click += new System.EventHandler(this.btnStayCommit_Click);
             // 
             // frmEnv
             // 
