@@ -658,8 +658,8 @@ namespace KyungsinLPR {
         // [+]1. Initialize the Evo engine library.
         private static uint numDev;
         public static int cc = 410; // Country code for South Korea.
-        private static IntPtr ctxDDI = IntPtr.Zero; // Context of DDI.
-        private static IntPtr[] handSSE = new IntPtr[2] { IntPtr.Zero, IntPtr.Zero }; // Handle of Snapshot Engine
+        private static int ctxDDI = -1; // Context of DDI.
+        private static int[] handSSE = new int[2] { -1, -1 }; // Handle of Snapshot Engine
         private static int rc;
         private static object obj = new object();
         public const int KOR = 410;
@@ -672,64 +672,39 @@ namespace KyungsinLPR {
             //leess 6.x 모듈변경
             string language = "KOR";
             if(cc == THA) language = "THA";
-            //rc = Evo.Func.Initialize(cc, "latency", null, ref ctxDDI);
-            Evo.Func.Initialize(language, "latency", null, ref ctxDDI);
+            rc = Evo.Func.Initialize(null, null, out ctxDDI);
             if(rc != 0) {
                 Console.WriteLine("Evo.Func.Initialize() failed. : {0}", rc);
                 return false;
             }
 
             // [+] Optionally examine the DDI.
-            // Get total number of available DNN devices.
-            rc = DDI.GetNumDevices(ctxDDI, out numDev);
-            Console.WriteLine(rc == 0);
+            rc = Evo.DDI.GetNumDev(ctxDDI, out numDev);
             Console.WriteLine("<< DNN Device Information >>");
             for(uint i = 0; i < numDev; i++) {
-                uint numFmt;
-                string devInfo;
-                StringBuilder dev = new StringBuilder(128);
-                // Get name of specific DNN device.
-                rc = DDI.GetDevice(ctxDDI, i, dev);
-                Console.WriteLine(rc == 0);
-
-                // Get total number of DNN model formats which are supported by specified DNN device.
-                rc = DDI.GetNumFormats(ctxDDI, dev.ToString(), out numFmt);
-                Console.WriteLine(rc == 0);
-                devInfo = dev.ToString() + " : ";
-                // Print all the DNN model formats which are supported
-                // by the specified DNN device.
-                for(uint j = 0; j < numFmt; j++) {
-                    StringBuilder format = new StringBuilder(16);
-                    // Get specific DNN model format.
-                    rc = DDI.GetFormat(ctxDDI, dev.ToString(), j, format);
-                    Console.WriteLine(rc == 0);
-                    devInfo += format.ToString();
-                    if(j < numFmt - 1)
-                        devInfo += ", ";
-                }
-                Console.WriteLine(devInfo);
+                StringBuilder devId = new StringBuilder(128);
+                StringBuilder devName = new StringBuilder(128);
+                rc = Evo.DDI.SelectDev(ctxDDI, i);
+                rc = Evo.DDI.GetDevID(ctxDDI, devId);
+                rc = Evo.DDI.GetFullName(ctxDDI, devName);
+                Console.WriteLine("  ID: {0}  Name: {1}", devId, devName);
             }
             Console.WriteLine();
 
-            // Must destroy the DDI context at last.
-            //leess 6.x 모듈변경
-            //DDI.FreeContext(ref ctxDDI);
-            DDI.Free(ref ctxDDI);
+            Evo.Func.FreeObj(ref ctxDDI);
             // [-]
             // 2. Allocate a new snapshot engine.
             for(int i = 0; i < 2; i++) {
                 //leess 6.x 모듈변경
                 //handSSE[i] = Evo.SSEngine.Allocate();
                 handSSE[i] = Evo.SSEngine.Create();
-                if(handSSE[i] == IntPtr.Zero) {
-                    Console.WriteLine("SnapshotEngine.Allocate() failed. : {0}", Evo.Func.GetLastRC());
+                if(handSSE[i] < 0) {
+                    Console.WriteLine("SnapshotEngine.Create() failed. : {0}", Evo.Func.GetLastRC());
                     return false;
                 }
 
-                // 3. Initialize the engine with DNN Devcie Descriptor.
-                //leess 6.x 모듈변경
-                //rc = Evo.SSEngine.Init(handSSE[i], "FP32:CPU");
-                rc = Evo.SSEngine.Init(handSSE[i], language, "FP32:CPU");
+                // 3. Initialize the engine.
+                rc = Evo.SSEngine.Init(handSSE[i], language, null);
                 if(rc != 0) {
                     Console.WriteLine("SnapshotEngine.Allocate() failed. : {0}", rc);
                     return false;
@@ -917,46 +892,31 @@ namespace KyungsinLPR {
                 dateTime = DateTime.Now;
                 lock(obj) {
                     //string inputSource = "EncodedImage";
-                    IntPtr ctxLPI = IntPtr.Zero; // Context of License Plate Information.
-                                                 // 5. Run the engine with input image.
+                    int ctxLPI = -1;
                     ctxLPI = Evo.SSEngine.Run(handSSE[idx], RegArray.SourcePath);
-                    // Get the return code.
                     rc = Evo.Func.GetLastRC();
-                    if(ctxLPI != IntPtr.Zero) {
+                    if(ctxLPI >= 0) {
                         uint num;
-                        //
-                        // 6. Examine the LPI context.
-                        //
-                        // Get total number of the detected license plates.
-                        rc = Evo.LPI.GetNumber(ctxLPI, out num);
+                        rc = Evo.LPI.GetNumLP(ctxLPI, out num);
                         Console.WriteLine(rc == 0);
 
-                        //leess 여러개 인식일 경우 가장 사이즈가 큰것 사용
                         int maxRegSize = 0;
                         for(uint i = 0; i < num; i++) {
                             Evo.Rect bbox;
                             int type;
                             float confidence;
                             StringBuilder strBuf = new StringBuilder(512);
-                            // Get text string.
-                            rc = Evo.LPI.GetString(ctxLPI, i, strBuf);
+                            rc = Evo.LPI.SelectLP(ctxLPI, i);
+                            rc = Evo.LPI.GetStr(ctxLPI, strBuf);
                             Console.WriteLine(rc == 0);
                             Console.WriteLine("\n{0}", strBuf.ToString());
-                            //leess 아래로 내림
-                            //if(RegArray.PlateNo != strBuf.ToString()) {
-                            //    if(RegArray.PlateNo.Length > 0) RegArray.PlateNo += ",";//leess 이게 이상함. 멀티로 줄려고 만든것 같은데, 아래에서 그냥 대체가 되버림!
-                            //    RegArray.PlateNo = strBuf.ToString();
-                            //}
-                            // Get the bounding box.
-                            rc = Evo.LPI.GetPosition(ctxLPI, i, out bbox);
+                            rc = Evo.LPI.GetPos(ctxLPI, out bbox);
                             Console.WriteLine(rc == 0);
                             Console.WriteLine(" --> Position: {0}, {1}, {2}, {3}", bbox.x, bbox.y, bbox.width, bbox.height);
-                            // Get the type and its confidence.
-                            rc = Evo.LPI.GetType(ctxLPI, i, out type, out confidence);
+                            rc = Evo.LPI.GetType(ctxLPI, out type, out confidence);
                             Console.WriteLine(rc == 0);
                             Console.WriteLine(" --> Type: {0} ({1}%)", type, confidence);
 
-                            //leess 사이즈 제일큰것 선택
                             int regSize = bbox.width * bbox.height;
                             if(regSize > maxRegSize) {
                                 maxRegSize = regSize;
@@ -966,30 +926,13 @@ namespace KyungsinLPR {
                             } else {
                                 Util.Logger.Log(string.Format("X 작은 사이즈 인식 결과 버림 : {0}", strBuf.ToString()));
                             }
-
-                            if(cc == KOR) {
-                                rc = Evo.LPI.GetAmType(ctxLPI, i, strBuf, out confidence);
-                                Console.WriteLine(rc == 0);
-                                Console.WriteLine("\n{0}", strBuf.ToString());
-                                Console.WriteLine(string.Format(" --> confidence: {0} ({1}%)", type, confidence));
-                                if(RegArray.CarType != strBuf.ToString()) {
-                                    if(RegArray.CarType.Length > 0) RegArray.CarType += ",";
-                                    RegArray.CarType = strBuf.ToString();
-                                    RegArray.Confidence = confidence;
-                                    RegArray.term = (long)(DateTime.Now - dateTime).TotalMilliseconds; // sp.ElapsedMilliseconds;
-                                }
-                            }
                         }
-                        // [-]
-                        // 7. Destroy the LPI context if no more used.
-                        //leess 6.x 모듈변경
-                        //Evo.LPI.FreeContext(ref ctxLPI);
-                        Evo.Engine.FreeLPI(handSSE[idx], ref ctxLPI);
+                        Evo.Func.FreeObj(ref ctxLPI);
                     } else {
-                        Console.WriteLine("Evo.SnapshotEngine.Run('{0}') failed. : {1}", RegArray.SourcePath, rc);
+                        Console.WriteLine("Evo.SSEngine.Run('{0}') failed. : {1}", RegArray.SourcePath, rc);
                         RegArray.PlateNo = "No_Detection";
                         RegArray.PlateRoi = string.Format("{0},{1},{2},{3}", 0, 0, 0, 0);
-                        RegArray.term = (long)(DateTime.Now - dateTime).TotalMilliseconds; // sp.ElapsedMilliseconds;
+                        RegArray.term = (long)(DateTime.Now - dateTime).TotalMilliseconds;
                     }
                     if(Camindex == 0)
                         clsThread.RegArray1[idx] = RegArray;
@@ -1005,12 +948,8 @@ namespace KyungsinLPR {
 
         public static void Release() {
             for(int i = 0; i < 2; i++) {
-                // 8. Deinitialize the engine.
                 Evo.SSEngine.Deinit(handSSE[i]);
-                // 9. Destroy the engine if no more used.
-                //leess 6.x 모듈변경
-                //Evo.SSEngine.FreeHandle(ref handSSE[i]);
-                Evo.SSEngine.Deinit(handSSE[i]);
+                Evo.Func.FreeObj(ref handSSE[i]);
             }
         }
 
@@ -1018,7 +957,7 @@ namespace KyungsinLPR {
         // FAVEngine (동영상 방식) 지원
         // ──────────────────────────────────────────────────
 
-        private static IntPtr[] handFAVE = new IntPtr[2] { IntPtr.Zero, IntPtr.Zero };
+        private static int[] handFAVE = new int[2] { -1, -1 };
         private static Thread[] faveThreads = new Thread[2];
         private static volatile bool[] faveRunning = new bool[2] { false, false };
 
@@ -1033,14 +972,14 @@ namespace KyungsinLPR {
             string language = (cc == THA) ? "THA" : "KOR";
             try {
                 handFAVE[camIdx] = Evo.FAVEngine.Create();
-                if(handFAVE[camIdx] == IntPtr.Zero) {
+                if(handFAVE[camIdx] < 0) {
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} Create() 실패 rc={1}", camIdx + 1, Evo.Func.GetLastRC()));
                     return false;
                 }
                 int frc = Evo.FAVEngine.Init(handFAVE[camIdx], language, null, rtspUrl);
                 if(frc != 0) {
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} Init() 실패 rc={1}", camIdx + 1, frc));
-                    Evo.FAVEngine.Destroy(ref handFAVE[camIdx]);
+                    Evo.Func.FreeObj(ref handFAVE[camIdx]);
                     return false;
                 }
                 faveRunning[camIdx] = true;
@@ -1057,35 +996,32 @@ namespace KyungsinLPR {
         }
 
         private static void RunFAVELoop(int camIdx) {
-            IntPtr hFAVE = handFAVE[camIdx];
+            int hFAVE = handFAVE[camIdx];
             Util.Logger.Log(string.Format("FAVEngine CAM{0} 루프 시작", camIdx + 1));
             while(faveRunning[camIdx]) {
-                IntPtr ctxGOP = IntPtr.Zero;
-                IntPtr ctxLPI = IntPtr.Zero;
+                int ctxGOP = -1;
+                int ctxLPI = -1;
                 try {
                     ctxLPI = Evo.FAVEngine.PopLPI(hFAVE, out ctxGOP);
-                    if(ctxLPI == IntPtr.Zero) {
-                        // 스트림 종료 또는 Deinit 호출
+                    if(ctxLPI < 0) {
                         Util.Logger.Log(string.Format("FAVEngine CAM{0} PopLPI 반환 NULL rc={1}", camIdx + 1, Evo.Func.GetLastRC()));
                         break;
                     }
 
-                    // 번호판 문자열 획득
                     uint num = 0;
-                    int lrc = Evo.LPI.GetNumber(ctxLPI, out num);
+                    int lrc = Evo.LPI.GetNumLP(ctxLPI, out num);
                     string plateNo = "No_Detection";
                     if(lrc == 0 && num > 0) {
                         StringBuilder strBuf = new StringBuilder(512);
-                        lrc = Evo.LPI.GetString(ctxLPI, 0, strBuf);
+                        Evo.LPI.SelectLP(ctxLPI, 0);
+                        lrc = Evo.LPI.GetStr(ctxLPI, strBuf);
                         if(lrc == 0 && strBuf.Length > 0)
                             plateNo = strBuf.ToString();
                     }
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} 인식 결과: {1}", camIdx + 1, plateNo));
 
-                    // GOP 이미지 저장
                     string imgPath = SaveFAVEImage(camIdx, ctxGOP);
 
-                    // RegArray 채우고 후처리 호출
                     string captureTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
                     ClsStructure.RegStruct[] regArr = (camIdx == 0) ? clsThread.RegArray1 : clsThread.RegArray2;
                     for(int j = 0; j < regArr.Length; j++) {
@@ -1108,17 +1044,17 @@ namespace KyungsinLPR {
                 } catch(Exception ex) {
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} RunFAVELoop 예외: {1}", camIdx + 1, ex.Message));
                 } finally {
-                    if(ctxGOP != IntPtr.Zero)
-                        Evo.FAVEngine.FreeGOP(hFAVE, ref ctxGOP);
-                    if(ctxLPI != IntPtr.Zero)
-                        Evo.Engine.FreeLPI(hFAVE, ref ctxLPI);
+                    if(ctxGOP >= 0)
+                        Evo.Func.FreeObj(ref ctxGOP);
+                    if(ctxLPI >= 0)
+                        Evo.Func.FreeObj(ref ctxLPI);
                 }
             }
             Util.Logger.Log(string.Format("FAVEngine CAM{0} 루프 종료", camIdx + 1));
         }
 
-        private static string SaveFAVEImage(int camIdx, IntPtr ctxGOP) {
-            if(ctxGOP == IntPtr.Zero) return "";
+        private static string SaveFAVEImage(int camIdx, int ctxGOP) {
+            if(ctxGOP < 0) return "";
             try {
                 string basePath = frmLprMain.ENV.CameraEnv.ImageSave.SavePath;
                 if(string.IsNullOrEmpty(basePath)) return "";
@@ -1131,17 +1067,17 @@ namespace KyungsinLPR {
                 string fname = string.Format("{0}_{1}.jpg", chName, DateTime.Now.ToString("yyyyMMddHHmmssfff"));
                 string fullPath = System.IO.Path.Combine(dateDir, fname);
 
-                // EvoGOP_SaveInJPEG는 ASCII 경로만 지원
+                Evo.GOP.SelectPic(ctxGOP, 0);
+                // SavePicInJPEG는 ASCII 경로만 지원
                 bool hasNonAscii = false;
                 foreach(char c in fullPath) { if(c > 127) { hasNonAscii = true; break; } }
                 if(hasNonAscii) {
-                    // 임시 ASCII 경로에 저장 후 이동
                     string tmpPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), fname);
-                    int grc = Evo.GOP.SaveInJPEG(ctxGOP, 0, tmpPath, 95);
+                    int grc = Evo.GOP.SavePicInJPEG(ctxGOP, tmpPath, 95);
                     if(grc == 0 && System.IO.File.Exists(tmpPath))
                         System.IO.File.Move(tmpPath, fullPath);
                 } else {
-                    Evo.GOP.SaveInJPEG(ctxGOP, 0, fullPath, 95);
+                    Evo.GOP.SavePicInJPEG(ctxGOP, fullPath, 95);
                 }
                 return fullPath;
             } catch(Exception ex) {
@@ -1155,17 +1091,17 @@ namespace KyungsinLPR {
         /// </summary>
         public static void ReleaseFAVE() {
             for(int i = 0; i < 2; i++) {
-                if(handFAVE[i] == IntPtr.Zero) continue;
+                if(handFAVE[i] < 0) continue;
                 faveRunning[i] = false;
                 try {
                     Evo.FAVEngine.Deinit(handFAVE[i]); // PopLPI 블로킹 해제
                     if(faveThreads[i] != null && faveThreads[i].IsAlive)
                         faveThreads[i].Join(3000);
-                    Evo.FAVEngine.Destroy(ref handFAVE[i]);
+                    Evo.Func.FreeObj(ref handFAVE[i]);
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} 해제 완료", i + 1));
                 } catch(Exception ex) {
                     Util.Logger.Log(string.Format("FAVEngine CAM{0} ReleaseFAVE 예외: {1}", i + 1, ex.Message));
-                    handFAVE[i] = IntPtr.Zero;
+                    handFAVE[i] = -1;
                 }
             }
         }
