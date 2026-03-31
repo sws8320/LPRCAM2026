@@ -866,20 +866,6 @@ namespace KyungsinLPR {
                 //searchRect.width = 0;
                 //searchRect.height = 0;
 
-                Evo.Output output = new Evo.Output();
-                //leess 6.x 모듈변경
-                //Evo.Func.GetParamOutput(handSSE[idx], out output);
-                Evo.Engine.GetParamOutput(handSSE[idx], out output);
-
-                if(bRegCarType)
-                    output.enAmType = 1;
-                else
-                    output.enAmType = 0; // 0:Disable 1:Enable
-
-                //leess 6.x 모듈변경
-                //Evo.Func.SetParamOutput(handSSE[idx], in output);
-                //rc = Evo.Func.SetParamSearchRect(handSSE[idx], in searchRect);
-                Evo.Engine.SetParamOutput(handSSE[idx], in output);
                 rc = Evo.Engine.SetParamSearchRect(handSSE[idx], in searchRect);
 
                 // [-]
