@@ -27,22 +27,49 @@ namespace KyungsinLPR
             PollInterface();
         }
 
+        private volatile bool _stopped = false;
+
         public void OnTimer(object state)
         {
-            var now = DateTime.Now;
-            lock (m_ipListLock)
+            if (_stopped) return;
+            try
             {
-                foreach (KeyValuePair<string, DateTime> pair in ipList)
+                var now = DateTime.Now;
+                string removeKey = null;
+                lock (m_ipListLock)
                 {
-                    // if the ip in the list is too old, remove it.
-                    if ((now - pair.Value).TotalSeconds > 3)
+                    foreach (KeyValuePair<string, DateTime> pair in ipList)
                     {
-                        ipList.Remove(pair.Key);
-                        IpUpdated(this, new IpUpdatedEventArgs(pair.Key, false));
-                        break;
+                        if ((now - pair.Value).TotalSeconds > 3)
+                        {
+                            removeKey = pair.Key;
+                            ipList.Remove(pair.Key);
+                            break;
+                        }
+                    }
+                }
+                if (removeKey != null)
+                {
+                    var handler = IpUpdated;
+                    if (handler != null && !_stopped)
+                    {
+                        try { handler(this, new IpUpdatedEventArgs(removeKey, false)); }
+                        catch (Exception ex) { try { Util.Logger.Log("[SSDPUtil.OnTimer handler] " + ex.Message); } catch { } }
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                try { Util.Logger.Log("[SSDPUtil.OnTimer] " + ex.Message); } catch { }
+            }
+        }
+
+        /// <summary>타이머 + 이벤트 정리 — frmEnv 종료 시 호출.</summary>
+        public void Stop()
+        {
+            _stopped = true;
+            try { timer?.Dispose(); timer = null; } catch { }
+            IpUpdated = null;
         }
 
         private static ArrayList addressTable = new ArrayList();

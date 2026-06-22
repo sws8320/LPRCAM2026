@@ -96,11 +96,19 @@ namespace KyungsinLPR
 
         void client_OnError(object sender, SDKNetLib.Event.AsyncSocketErrorEventArgs e)
         {
-            ErrorDel?.Invoke();
-            if (Ping())
+            try
             {
-                SocketClose();
-                SocketOpen();
+                ErrorDel?.Invoke();
+                if (Ping())
+                {
+                    SocketClose();
+                    SocketOpen();
+                }
+            }
+            catch (Exception ex)
+            {
+                // 비동기 콜백에서 예외가 unhandled로 빠지면 프로세스 종료 — 반드시 삼킴
+                Util.Logger.Log(string.Format("[NetworkDisplay.OnError] IP={0} Port={1} {2}", Ip, Port, ex.ToString()));
             }
         }
 
@@ -136,9 +144,20 @@ namespace KyungsinLPR
 
         public void SocketOpen()
         {
-            client.Close();
-
-            client.Connect(Ip, (short)Port);
+            if (string.IsNullOrWhiteSpace(Ip) || Port <= 0 || Port > 65535)
+            {
+                Util.Logger.Log(string.Format("[NetworkDisplay.SocketOpen] 잘못된 IP/Port 무시 — IP='{0}' Port={1}", Ip, Port));
+                return;
+            }
+            try
+            {
+                client.Close();
+                client.Connect(Ip, (short)Port);
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Log(string.Format("[NetworkDisplay.SocketOpen] IP={0} Port={1} 연결 실패: {2}", Ip, Port, ex.ToString()));
+            }
         }
 
         private string ToHexString(byte[] nor, int Size)
@@ -384,9 +403,18 @@ namespace KyungsinLPR
 
         private bool Ping()
         {
-            Ping ping = new Ping();
-            PingReply reply = ping.Send(Ip, 100);
-            return reply.Status == IPStatus.Success;
+            if (string.IsNullOrWhiteSpace(Ip)) return false;
+            try
+            {
+                Ping ping = new Ping();
+                PingReply reply = ping.Send(Ip, 100);
+                return reply.Status == IPStatus.Success;
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Log(string.Format("[NetworkDisplay.Ping] IP={0} 실패: {1}", Ip, ex.Message));
+                return false;
+            }
         }
 
         private void Wait()
@@ -471,17 +499,10 @@ namespace KyungsinLPR
             //Util.Logger.Log(string.Format("8색 전광판 출력 1열 '{0}' {1} 2열 '{2}' {3}", Ment1, Color1, Ment2, Color2));
             try
             {
-                if (currentMent1 != Ment1)
-                {
-                    Util.Logger.Log(string.Format("{0} {1}", Ment1, Ment2));
-                    Util.Logger.Log(string.Format("{0}", BitConverter.ToString(arr[0])));
-                    Util.Logger.Log(string.Format("{0}", BitConverter.ToString(arr[1])));
-                }
+                // (전광판 전송 바이트 덤프 로그 제외 — 노이즈 제거)
                 for (int i = 0; i < arr.Length; i++)
                 {
                     Send(arr[i]);
-                    if ((i == 0 && currentMent1 != Ment1) || (i == 1 && currentMent2 != Ment2))
-                        Util.Logger.Log(string.Format("전광판 출력 {0} {1}", i == 0 ? Ment1 : Ment2, BitConverter.ToString(arr[i])));
                     string indata = string.Empty;
                 }
             }

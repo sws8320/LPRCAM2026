@@ -19,6 +19,9 @@ namespace KyungsinLPR
 
         public SerialDevice.ClsKJC_1000 KJC1000 = null;
         public SerialDevice.ClsRealSys RealSys = null;
+        public ClsDingtian Dingtian = null;
+        // 서버모드 다중 Dingtian 박스(카메라별 DioIp). 메인(.110) 외 추가 박스를 IP별로 캐시.
+        private readonly System.Collections.Generic.Dictionary<string, ClsDingtian> _camDingtian = new System.Collections.Generic.Dictionary<string, ClsDingtian>();
         private ClsStructure.EnvStruct Env;
         private SerialPort FirstDisPlayPort = new SerialPort();
         private SerialPort SecondDisPlayPort = new SerialPort();
@@ -104,17 +107,32 @@ namespace KyungsinLPR
             try
             {
                 Util.Logger.Log("DIO 설정");
-                DioPort = SetSerialPort(Env.CommonEnv.Dio.DioSetting.SerialPort, Env.CommonEnv.Dio.DioSetting.Setting);
-                DioPort.Open();
-                if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
+                if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.DINGTIAN.ToString()))
                 {
-                    KJC1000 = new ClsKJC_1000(DioPort);
-                    KJC1000.InEvent += new ClsKJC_1000.eventInput(DIOINPUT);
+                    // DINGTIAN 이더넷 릴레이 — 시리얼 포트 사용 안 함. HTTP /input.cgi 폴링으로 입력 수신
+                    int netPort = Env.CommonEnv.Dio.DioSetting.NetPort > 0 ? Env.CommonEnv.Dio.DioSetting.NetPort : 60001;
+                    Dingtian = new ClsDingtian(Env.CommonEnv.Dio.DioSetting.IpAddress, netPort);
+                    Dingtian.InEvent += new ClsDingtian.eventInput(DIOINPUT);
+                    // 입력 폴링 주기 — [COMMON] diopollms (없거나 범위밖이면 50ms). 낮을수록 검지 빠름(보드/네트워크 부하 증가)
+                    int pollMs = Util.Function.IntTryParse(Util.Function.IniReadValue("COMMON", "diopollms"));
+                    if (pollMs < 30 || pollMs > 5000) pollMs = 50;
+                    Dingtian.StartInputPolling(pollMs);
+                    Util.Logger.Log(string.Format("DINGTIAN 시작: {0}:{1} (입력폴링 {2}ms)", Env.CommonEnv.Dio.DioSetting.IpAddress, netPort, pollMs));
                 }
-                else if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.REALSYS.ToString()))
+                else
                 {
-                    RealSys = new ClsRealSys(DioPort);
-                    RealSys.InEvent += new ClsRealSys.eventInput(DIOINPUT);
+                    DioPort = SetSerialPort(Env.CommonEnv.Dio.DioSetting.SerialPort, Env.CommonEnv.Dio.DioSetting.Setting);
+                    DioPort.Open();
+                    if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
+                    {
+                        KJC1000 = new ClsKJC_1000(DioPort);
+                        KJC1000.InEvent += new ClsKJC_1000.eventInput(DIOINPUT);
+                    }
+                    else if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.REALSYS.ToString()))
+                    {
+                        RealSys = new ClsRealSys(DioPort);
+                        RealSys.InEvent += new ClsRealSys.eventInput(DIOINPUT);
+                    }
                 }
             }
             catch (Exception DioError)
@@ -182,11 +200,54 @@ namespace KyungsinLPR
                 }
         }
 
-        public void GateOpen(int DevIdx)
+        public bool IsDingtian()
         {
-            Util.Logger.Log("차단기 개방 DioPort" + DioPort.IsOpen.ToString());
+            return Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.DINGTIAN.ToString());
+        }
+
+        /// <summary>카메라(DevIdx)의 Dingtian 박스 — 서버캠(>=2)이 메인과 다른 DioIp면 그 박스(없으면 생성·캐시), 아니면 메인.</summary>
+        private ClsDingtian DingtianFor(int DevIdx)
+        {
             try
             {
+                if (DevIdx >= 2)
+                {
+                    string ip = clsServerCamEnv.GetDioIp(DevIdx);
+                    string mainIp = Env.CommonEnv.Dio.DioSetting.IpAddress ?? "";
+                    if (!string.IsNullOrEmpty(ip) && ip != mainIp)
+                    {
+                        ClsDingtian d;
+                        if (!_camDingtian.TryGetValue(ip, out d))
+                        {
+                            int port = Env.CommonEnv.Dio.DioSetting.NetPort > 0 ? Env.CommonEnv.Dio.DioSetting.NetPort : 60001;
+                            d = new ClsDingtian(ip, port);
+                            _camDingtian[ip] = d;
+                            Util.Logger.Log(string.Format("DINGTIAN 추가 박스 연결 {0}:{1} (카메라{2})", ip, port, DevIdx + 1));
+                        }
+                        return d;
+                    }
+                }
+            }
+            catch (Exception ex) { Util.Logger.Log("DingtianFor 오류: " + ex.Message); }
+            return Dingtian;   // 메인 공유박스
+        }
+
+        public void GateOpen(int DevIdx)
+        {
+            try
+            {
+                if (IsDingtian())
+                {
+                    // 서버모드 다중박스: 카메라별 Dingtian IP가 메인과 다르면 그 박스로 라우팅(8릴레이 초과/분산)
+                    ClsDingtian dt = DingtianFor(DevIdx);
+                    Util.Logger.Log("차단기 개방 DINGTIAN");
+                    if (dt == null) return;
+                    dt.RelayOn(Env.CommonEnv.Dio.DioOutPut[DevIdx].Port, Env.CommonEnv.Dio.DioOutPut[DevIdx].Delay, Env.CommonEnv.Dio.DioOutPut[DevIdx].Keep);
+                    if (Env.CommonEnv.Dio.DioOutPut[DevIdx].AddPort > 0)
+                        dt.RelayOn(Env.CommonEnv.Dio.DioOutPut[DevIdx].AddPort, Env.CommonEnv.Dio.DioOutPut[DevIdx].AddDelay, Env.CommonEnv.Dio.DioOutPut[DevIdx].AddKeep);
+                    return;
+                }
+                Util.Logger.Log("차단기 개방 DioPort" + DioPort.IsOpen.ToString());
                 if (!DioPort.IsOpen)
                     DioPort.Open();
                 if (DioPort.IsOpen)
@@ -209,12 +270,17 @@ namespace KyungsinLPR
             }
             catch (Exception GateOpenError)
             {
-                Util.Logger.Log(string.Format("GateOpen KJC1000 Error {0}", GateOpenError));
+                Util.Logger.Log(string.Format("GateOpen Error {0}", GateOpenError));
             }
         }
 
         public void TestGateOpen(int Port)
         {
+            if (IsDingtian())
+            {
+                if (Dingtian != null) Dingtian.RelayOn(Port, 0, 800);
+                return;
+            }
             if (DioPort.IsOpen)
                 if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
                     KJC1000.RelayOn(Port, 0, 800);
@@ -224,6 +290,14 @@ namespace KyungsinLPR
 
         public void IsolatedGateOpen()
         {
+            if (IsDingtian())
+            {
+                if (Dingtian == null) return;
+                Dingtian.RelayOn(Env.CommonEnv.Dio.IsolatePort.Out.Port, Env.CommonEnv.Dio.IsolatePort.Out.Delay, Env.CommonEnv.Dio.IsolatePort.Out.Keep);
+                if (Env.CommonEnv.Dio.IsolatePort.Out.AddPort > 0)
+                    Dingtian.RelayOn(Env.CommonEnv.Dio.IsolatePort.Out.AddPort, Env.CommonEnv.Dio.IsolatePort.Out.AddDelay, Env.CommonEnv.Dio.IsolatePort.Out.AddKeep);
+                return;
+            }
             if (DioPort.IsOpen)
             {
                 if (Env.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))

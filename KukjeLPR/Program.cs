@@ -14,6 +14,20 @@ namespace KyungsinLPR
         [STAThread]
         static void Main(string[] args)
         {
+            // 전역 예외 핸들러 — 어떤 스레드에서든 예외 발생 시 사용자에게 메시지박스로 안내, 종료 방지
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (sender, e) => ShowFatalDialog("Application.ThreadException (UI 스레드)", e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+            {
+                var ex = e.ExceptionObject as Exception;
+                ShowFatalDialog("AppDomain.UnhandledException (백그라운드 스레드)", ex);
+            };
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (sender, e) =>
+            {
+                ShowFatalDialog("TaskScheduler.UnobservedTaskException", e.Exception);
+                e.SetObserved();
+            };
+
             bool flagMutex;
 
             Mutex m_hMutex;
@@ -66,6 +80,45 @@ namespace KyungsinLPR
                 AutoClosingMessageBox msg = new AutoClosingMessageBox();
                 msg.Show("프로그램이 이미 실행중입니다.", "중복실행방지", 3000);
             }
+        }
+
+        /// <summary>전역에서 잡힌 치명적 예외를 메시지박스로 표시 — 종료 막기 위한 안전망</summary>
+        private static void ShowFatalDialog(string source, Exception ex)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("■ KyungsinLPR 예외 발생");
+                sb.AppendLine();
+                sb.AppendLine("발생 위치: " + source);
+                if (ex != null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine("예외 형식: " + ex.GetType().Name);
+                    sb.AppendLine("메시지: " + ex.Message);
+                    if (ex.HResult != 0)
+                        sb.AppendLine(string.Format("HRESULT: 0x{0:X8}", ex.HResult));
+                    sb.AppendLine();
+                    sb.AppendLine("스택 트레이스:");
+                    sb.AppendLine(ex.StackTrace ?? "(없음)");
+                    if (ex.InnerException != null)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine("내부 예외: " + ex.InnerException.GetType().Name);
+                        sb.AppendLine("내부 메시지: " + ex.InnerException.Message);
+                    }
+                }
+                sb.AppendLine();
+                sb.AppendLine("로그 파일에서 시간대별 컨텍스트를 확인하세요.");
+                try
+                {
+                    Util.Logger.Log(string.Format("[FATAL] {0}: {1}", source, ex != null ? ex.ToString() : "(null)"));
+                }
+                catch { }
+                MessageBox.Show(sb.ToString(), "KyungsinLPR 오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            catch { /* 메시지박스 자체가 실패하면 무시 */ }
         }
     }
 }

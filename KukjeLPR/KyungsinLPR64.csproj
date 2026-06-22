@@ -76,6 +76,8 @@
       <HintPath>dll\LibSocket.dll</HintPath>
     </Reference>
     <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="WindowsFormsIntegration" />
     <Reference Include="SDKNetLib, Version=1.7.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>dll\SDKNetLib.dll</HintPath>
@@ -84,7 +86,9 @@
       <HintPath>dll\SerialDevice.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Management" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
@@ -107,6 +111,7 @@
     <Compile Include="Class\clsBusinessCar.cs" />
     <Compile Include="Class\clsDataTransaction.cs" />
     <Compile Include="Class\clsFunction.cs" />
+    <Compile Include="Class\clsImageUploader.cs" />
     <Compile Include="Class\clsLPR.cs" />
     <Compile Include="Class\clsOutService.cs" />
     <Compile Include="Class\clsQuery.cs" />
@@ -133,8 +138,10 @@
     <Compile Include="Class\Datatable.cs" />
     <Compile Include="Class\DelayReg.cs" />
     <Compile Include="Class\RegModule\CoreLogic.cs" />
+    <Compile Include="Class\RtspPreview.cs" />
     <Compile Include="Class\RegModule\Elanpr.cs" />
     <Compile Include="Class\LprRelay.cs" />
+    <Compile Include="Class\ClsDingtian.cs" />
     <Compile Include="Class\NetWork Display\NetworkDisplay.cs" />
     <Compile Include="Class\RegModule\NgisWay.cs" />
     <Compile Include="Class\clsExceptGroup.cs" />
@@ -193,9 +200,8 @@
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Class\iNova2\frmAdvFeature.resx">
-      <DependentUpon>frmAdvFeature.cs</DependentUpon>
       <SubType>Designer</SubType>
-      <LogicalName>KyungsinLPR.iNova2.frmAdvFeature.resources</LogicalName>
+      <ManifestResourceName>KyungsinLPR.iNova2.frmAdvFeature</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Form\frmExposureCheck.resx">
       <DependentUpon>frmExposureCheck.cs</DependentUpon>

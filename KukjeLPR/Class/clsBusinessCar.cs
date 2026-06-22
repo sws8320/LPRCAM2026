@@ -61,17 +61,12 @@ namespace KyungsinLPR
 
         public static string BusinessCarMent(string CarNo, string Ment)
         {
-            string rtn = string.Empty;
-            if (!IsBusinessCar(CarNo))
-                rtn = Ment;
-            else
-            {
-                if (DisPlayLineMent != string.Empty)
-                    rtn = DisPlayLineMent;
-                else
-                    rtn = Ment;
-            }
-            return rtn;
+            // 영업용 번호판 확인 사용이 꺼져있으면 일반 멘트 그대로 반환
+            // (기존 버그: UseBusinessCar 체크 없이 IsBusinessCar만 봐서, 자/아/바/사/배가 포함된
+            //  일반 차량까지 영업용 멘트로 표시되던 문제 — 게이트/소켓 로직은 UseBusinessCar를 체크하지만 멘트만 누락)
+            if (!UseBusinessCar || !IsBusinessCar(CarNo))
+                return Ment;
+            return string.IsNullOrEmpty(DisPlayLineMent) ? Ment : DisPlayLineMent;
         }
     }
 }

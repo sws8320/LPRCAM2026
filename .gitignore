@@ -33,3 +33,14 @@ CameraSetting.ini
 # Windows 임시 파일
 Thumbs.db
 Desktop.ini
+
+# 대용량 생성물 (소스 아님 — 재생성/다운로드 가능)
+# CRNN 모델: D:\license-plate-recognition export_onnx.py로 생성
+*.onnx
+# Tesseract 학습데이터: 다운로드
+*.traineddata
+# 배포 번들(UPDATE/모델/tessdata)
+SETUP/
+
+# Claude 설정
+.claude/

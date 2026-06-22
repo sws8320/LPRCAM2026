@@ -26,7 +26,16 @@ namespace KyungsinLPR {
         private clsSerialPort SerialDev = null;
         private NetworkDisplay NetDev = null;
 
-        private bool[] RegedCar = new bool[2];
+        private bool[] RegedCar = new bool[15];   // 서버모드 N대(0~14). 0/1=기존, 2~14=서버캠
+        private bool[] _lastReged = new bool[15];  // DataProcess 끝(1079)에서 RegedCar 리셋 전 값 보존(표시용)
+
+        /// <summary>직전 DataProcess 의 정기권 등록차량 여부(카드 일반/정기 표시·전광판용).
+        ///  RegedCar 는 DataProcess 끝에서 false 로 리셋되므로 리셋 전 보존값(_lastReged)을 반환.</summary>
+        public bool GetRegedCar(int idx) { return idx >= 0 && idx < _lastReged.Length && _lastReged[idx]; }
+
+        /// <summary>모든 DataProcess 호출 직렬화용 공유 락 — 단일 DB연결(TCon)·NetDev 동시사용 방지(N대 동시 캡처 대비).
+        ///  cam0/1(AfterRegPlateCam)·서버캠(ProcessServerCamResult) 모두 이 락으로 감싼다.</summary>
+        public static readonly object ProcLock = new object();
 
         public bool Processing = false;
 
@@ -201,6 +210,8 @@ namespace KyungsinLPR {
                     NetDev = frmLprMain.NetDisPlay1;
                 else if(Env.CommunicationEnv.DisPlay[1].Net.Use && CamIdx == 1)
                     NetDev = frmLprMain.NetDisPlay2;
+                else if(CamIdx >= 2)
+                    NetDev = null;   // 서버캠(2~14): 네트워크 전광판은 후속 단계, 직렬 오출력 방지
                 TimeSpan diff = DateTime.Now - LastGetMst;
 
                 ClsStructure.Lpr_Info LprInfo = new ClsStructure.Lpr_Info();
@@ -211,7 +222,27 @@ namespace KyungsinLPR {
                     case 1:
                         LprInfo = Env.CommunicationEnv.Lpr2Info;
                         break;
+                    default:
+                        LprInfo = clsServerCamEnv.GetLpr(CamIdx);   // 서버캠(2~14): [SVRCAM] 장비번호/입출구, LprOpt=cam1 상속
+                        break;
                 }
+                // 서버모드: 각 카메라의 입출차 처리옵션(LprOpt: 차단기/소켓/LprTrns 등)을 개별설정([SVRCAM])에서 적용.
+                //  입구면 Ent 섹션, 출구면 Exit 섹션 체크값. 개별설정 안 된 카메라는 글로벌(switch 결과) 유지.
+                //  (cam0/1 포함 — cam2가 글로벌 LPR2를 보던 문제도 개별값으로 일원화)
+                if(clsServerCamEnv.ServerMode)
+                {
+                    ClsStructure.ProcessOption svrOpt;
+                    if(clsServerCamEnv.TryGetLprOpt(CamIdx, LprInfo.InOutType, out svrOpt))
+                        LprInfo.LprOpt = svrOpt;
+                }
+
+                // 소켓(요금계산기/사무실) 전송용 채널명·STXETX — 서버캠(CamIdx>=2)은 IPCamera1/2Info 가 없으므로
+                //  채널명은 자기 장비채널(LprInfo.ChNo), STXETX 는 cam1 설정 상속. (기존 0/1 동작 불변)
+                string camChName = (CamIdx == 0) ? Env.CameraEnv.IPCamera1Info.ChName
+                                 : (CamIdx == 1) ? Env.CameraEnv.IPCamera2Info.ChName
+                                 : LprInfo.ChNo;
+                bool camStxEtx = (CamIdx == 1) ? Env.CameraEnv.IPCamera2Info.SendStxEtx
+                               : Env.CameraEnv.IPCamera1Info.SendStxEtx;
 
                 RegedCar[CamIdx] = false;
 
@@ -270,8 +301,12 @@ namespace KyungsinLPR {
 
                     Util.Logger.Log(string.Format("정기 차량 조회 {0} {1} {2}", Env.CommunicationEnv.RegCorrection, CarNo, Number));
                     RegedInfo = FindRegedCar(Env.CommunicationEnv.RegCorrection, CarNo, Number);
+                    if(RegedInfo == null) RegedInfo = new DataRow[0];
                     Env.RegCarControl.iControlType = 0;
-                    if(Type.Equals((int)ClsStructure.InoutType.입구용)) {
+                    // 그룹 제한은 기본적으로 입구용에서 적용되며, UseExitGroupGate가 켜져 있으면 출구용에도 적용된다.
+                    bool applyGroupGate = Type.Equals((int)ClsStructure.InoutType.입구용) ||
+                                          (Type.Equals((int)ClsStructure.InoutType.출구용) && Env.RegCarControl.UseExitGroupGate);
+                    if(applyGroupGate) {
                         if(Env.RegCarControl.UseGroupGate && RegedInfo.Length > 0) {
                             if(Env.RegCarControl.GateGroupNo > 0) {
                                 bool process = true;
@@ -291,22 +326,36 @@ namespace KyungsinLPR {
                                 RegedInfo[0]["iusingarea08"].ToString(), RegedInfo[0]["iusingarea09"].ToString(),
                                 RegedInfo[0]["iusingarea10"].ToString(), RegedInfo[0]["iusingarea11"].ToString(), RegedInfo[0]["iusingarea12"].ToString() };
                                 if(process) {
-                                    int findidx = -1;
-                                    for(int i = 0; i < 13; i++) {
-                                        if(Env.RegCarControl.GateGroupNo != i + 1 &&
-                                            Env.RegCarControl.GroupUse[i] && Env.RegCarControl.GroupUse[i] == (usinggroup[i] == "1")) {
-                                            findidx = i;
-                                            break;
+                                    // 정기권 차량의 등록 게이트그룹 목록(usinggroup)에 본 LPR의 소속 그룹(GateGroupNo)이
+                                    // 포함돼 있으면 → 다른 제한 그룹 체크를 건너뛰고 정기차로 통과시킨다.
+                                    // (기존: 어느 그룹이든 "제한 그룹"에 걸리면 막혔음 — 복수 게이트그룹 등록 시
+                                    //  소속 그룹이 있어도 다른 그룹 때문에 입차 거부되는 문제 수정)
+                                    int myIdx = Env.RegCarControl.GateGroupNo - 1;  // 0-based
+                                    bool inMyGroup = (myIdx >= 0 && myIdx < 13 && usinggroup[myIdx] == "1");
+
+                                    if(!inMyGroup) {
+                                        int findidx = -1;
+                                        for(int i = 0; i < 13; i++) {
+                                            if(Env.RegCarControl.GateGroupNo != i + 1 &&
+                                                Env.RegCarControl.GroupUse[i] && Env.RegCarControl.GroupUse[i] == (usinggroup[i] == "1")) {
+                                                findidx = i;
+                                                break;
+                                            }
+                                        }
+                                        if(findidx >= 0) {
+                                            ControlMent = Env.RegCarControl.GroupMent[findidx];
+                                            RegedInfo = null;
+                                            Env.RegCarControl.iControlType = 4;
                                         }
                                     }
-                                    if(findidx >= 0) {
-                                        ControlMent = Env.RegCarControl.GroupMent[findidx];
-                                        RegedInfo = null;
-                                        Env.RegCarControl.iControlType = 4;
+                                    else {
+                                        Util.Logger.Log(string.Format("그룹 통과: 정기권에 소속 그룹({0}) 포함 — 다른 제한 그룹 무시", Env.RegCarControl.GateGroupNo));
                                     }
                                 }
                             }
                         }
+                    }
+                    if(Type.Equals((int)ClsStructure.InoutType.입구용)) {
                         if(Env.RegCarControl.Otherparks.Count > 0) {
                             if(Env.RegCarControl.OtherparkUse) {
                                 if(Env.RegCarControl.OtherparksTimeuse) {
@@ -754,10 +803,10 @@ namespace KyungsinLPR {
                                 if(LprInfo.LprOpt.Period_Passtrns) {
                                     if(RegedInfo[0]["iGroup"].ToString() != clsExceptGroup.ExceptGrpNo.ToString()) {
                                         Util.Logger.Log("정기 차량 입차 내역 기록");
-                                        item.Query = clsQuery.SetEntrancePassTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), RegedInfo[0], CarNo, Number, Image);
+                                        item.Query = clsQuery.SetEntrancePassTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, RegedInfo[0], CarNo, Number, Image);
                                     } else {
                                         Util.Logger.Log("요금 계산 대상 정기권 일반 입차 내역 기록");
-                                        item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image, RegedInfo[0]["iGroup"].ToString(), irate);
+                                        item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image, RegedInfo[0]["iGroup"].ToString(), irate);
                                     }
                                     Util.Logger.Query(item.Query);
                                     //QList.Add(item);
@@ -766,7 +815,7 @@ namespace KyungsinLPR {
 
                                 if(!LprInfo.LprOpt.Period_Passtrns && RegedInfo[0]["iGroup"].ToString() == clsExceptGroup.ExceptGrpNo.ToString()) {
                                     Util.Logger.Log("일반 차량 입차 내역 기록");
-                                    item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image, RegedInfo[0]["iGroup"].ToString(), irate);
+                                    item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image, RegedInfo[0]["iGroup"].ToString(), irate);
                                     Util.Logger.Query(item.Query);
                                     //QList.Add(item);
                                     Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -785,8 +834,8 @@ namespace KyungsinLPR {
                                     Util.clsMssql.ExecQuery(TCon, item.Query);
                                 }
                                 if(LprInfo.LprOpt.Period_SendData) {
-                                    SendEnt_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, CamIdx.Equals(0) ? Env.CameraEnv.IPCamera1Info.ChName : Env.CameraEnv.IPCamera2Info.ChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
-                                    bool stxetx = CamIdx == 0 ? Env.CameraEnv.IPCamera1Info.SendStxEtx : Env.CameraEnv.IPCamera2Info.SendStxEtx;
+                                    SendEnt_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, camChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
+                                    bool stxetx = camStxEtx;
                                     Util.Logger.Log(string.Format("정기차량 입차 정보 전송 {0}", SendEnt_Msg));
                                     if(stxetx)
                                         frmLprMain.Main.LprEntSvr.SendMsgSTXETX(SendEnt_Msg);
@@ -796,7 +845,7 @@ namespace KyungsinLPR {
                             } else {
                                 if(LprInfo.LprOpt.Normal_Tckttrns) {
                                     Util.Logger.Log("일반 차량 입차 내역 기록");
-                                    item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image, "0", irate);
+                                    item.Query = clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image, "0", irate);
                                     Util.Logger.Query(item.Query);
                                     //QList.Add(item);
                                     Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -816,8 +865,8 @@ namespace KyungsinLPR {
                                 }
                                 //if (LprInfo.LprOpt.Normal_SendData || LprInfo.LprOpt.Period_SendData || (clsBusinessCar.IsBusinessCar(CarNo) && clsBusinessCar.UseEntranceSocketDataSend))
                                 if((RegedCar[CamIdx] && LprInfo.LprOpt.Period_SendData) || (!RegedCar[CamIdx] && LprInfo.LprOpt.Normal_SendData) || (clsBusinessCar.IsBusinessCar(CarNo) && clsBusinessCar.UseEntranceSocketDataSend)) {
-                                    SendEnt_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, CamIdx.Equals(0) ? Env.CameraEnv.IPCamera1Info.ChName : Env.CameraEnv.IPCamera2Info.ChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
-                                    bool stxetx = CamIdx == 0 ? Env.CameraEnv.IPCamera1Info.SendStxEtx : Env.CameraEnv.IPCamera2Info.SendStxEtx;
+                                    SendEnt_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, camChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
+                                    bool stxetx = camStxEtx;
                                     Util.Logger.Log("일반 차량 입차 정보 전송");
                                     if(clsBusinessCar.UseBusinessCar)
                                         if(clsBusinessCar.IsBusinessCar(CarNo) && !clsBusinessCar.UseEntranceSocketDataSend) {
@@ -860,7 +909,7 @@ namespace KyungsinLPR {
                         if(RegedCar[CamIdx]) {
                             if(LprInfo.LprOpt.Period_Passtrns) {
                                 Util.Logger.Log("정기 차량 출차 내역 기록");
-                                item.Query = clsQuery.SetExitPassTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), RegedInfo[0], CarNo, Number, Image);
+                                item.Query = clsQuery.SetExitPassTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, RegedInfo[0], CarNo, Number, Image);
                                 Util.Logger.Query(item.Query);
                                 //QList.Add(item);
                                 Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -883,7 +932,7 @@ namespace KyungsinLPR {
                                 LagChk = BeforeCalOpt.LagCarCheck(CarNo, Env.CommonEnv.DBInfo.TrnsDb, TCon);
                             if(LagChk == BeforeCalOpt.LagReturn.Lag) {
                                 Util.Logger.Log("레그시간 출차 기록");
-                                item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image);
+                                item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image);
                                 Util.Logger.Query(item.Query);
                                 GateOpen(CamIdx);
                                 Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -947,7 +996,7 @@ namespace KyungsinLPR {
                                                     GateOpen(CamIdx);
                                                     if(!LprInfo.LprOpt.Normal_Tckttrns) {
                                                         Util.Logger.Log("일반 차량 출차 내역 기록");
-                                                        item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image);
+                                                        item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image);
                                                         Util.Logger.Query(item.Query);
                                                         //QList.Add(item);
                                                         Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -958,7 +1007,7 @@ namespace KyungsinLPR {
                                     }
                                     if(LprInfo.LprOpt.Normal_Tckttrns) {
                                         Util.Logger.Log("일반 차량 출차 내역 기록");
-                                        item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, (CamIdx.Equals(0) ? Env.CommunicationEnv.Lpr1Info : Env.CommunicationEnv.Lpr2Info), CarNo, Image);
+                                        item.Query = clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image);
                                         Util.Logger.Query(item.Query);
                                         //QList.Add(item);
                                         Util.clsMssql.ExecQuery(TCon, item.Query);
@@ -985,11 +1034,11 @@ namespace KyungsinLPR {
                                 Rtn = "요금계산기 자료 전송";
                                 string SendCal_Msg = string.Empty;
                                 if(LagChk != BeforeCalOpt.LagReturn.Lag)
-                                    SendCal_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, CamIdx.Equals(0) ? Env.CameraEnv.IPCamera1Info.ChName : Env.CameraEnv.IPCamera2Info.ChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
+                                    SendCal_Msg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, camChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
                                 else
                                     SendCal_Msg = string.Format("!{0}#{1}#{2}#LAGOUT", LprInfo.ChNo, CarNo, Image);
                                 //if (Env.CameraEnv.SockDataFormat == (int)ClsStructure.SockFormat.Kukje)
-                                bool stxetx = CamIdx == 0 ? Env.CameraEnv.IPCamera1Info.SendStxEtx : Env.CameraEnv.IPCamera2Info.SendStxEtx;
+                                bool stxetx = camStxEtx;
                                 Util.Logger.Log("요금계산기 정보 전송");
                                 if(clsBusinessCar.UseBusinessCar && clsBusinessCar.IsBusinessCar(CarNo) && !clsBusinessCar.UseExitSocketDataSend) {
                                     SendCal_Msg = "";
@@ -1035,13 +1084,14 @@ namespace KyungsinLPR {
                     Util.Logger.Log("APB 입력 중단 입출구 타입 " + Type.ToString());
                 }
                 if(Env.SendOffice) {
-                    string OfficeMsg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, CamIdx.Equals(0) ? Env.CameraEnv.IPCamera1Info.ChName : Env.CameraEnv.IPCamera2Info.ChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
+                    string OfficeMsg = clsFunction.MakeTransMessage(Env.CameraEnv.SockDataFormat, camChName, CarNo, Env.CameraEnv.ImageSave.SavePath, Image, ProcTime);
                     frmLprMain.Main.SendOfficeList.Add(string.Format("CAPTURE:{0}", OfficeMsg));
                 }
             } catch(Exception DataProcess_Error) {
                 Util.Logger.Query(string.Format("DataProcess_Error : {0}", DataProcess_Error.Message));
             } finally {
                 Processing = false;
+                if(CamIdx >= 0 && CamIdx < _lastReged.Length) _lastReged[CamIdx] = RegedCar[CamIdx];   // 리셋 전 정기여부 보존(표시용)
                 RegedCar[CamIdx] = false;
             }
             return Rtn;

@@ -1,0 +1,17 @@
+{
+  "charset": "0123456789가거경고광구기나남너노누다대더도두라러로루마머모무바배버보부북사산서소수아어오우울인자저전조주천충하허호",
+  "num_classes": 63,
+  "blank": 0,
+  "img_h": 32,
+  "img_w": 192,
+  "t_steps": 47,
+  "input_name": "input",
+  "output_name": "logits",
+  "normalize": {
+    "scale": 0.00392156862745098,
+    "mean": 0.5,
+    "std": 0.5
+  },
+  "layout": "NCHW",
+  "source_model": "plate_crnn.daegu-warm.pth"
+}

@@ -36,13 +36,16 @@ namespace KyungsinLPR
 
         //leess 사이즈 동적 변경
         int imgWidth = 0, imgHeight = 0;//불러온 캡쳐이미지 사이즈
+        // 실제 적용된 표시 스케일 (원본 대비). 마우스 좌표 → 원본 좌표 환산에 사용.
+        // USB 5MP 등 고해상도 카메라 지원을 위해 화면 작업영역 fit으로 동적 결정.
+        private double _displayScale = 0.5;
 
         public frmPicConfig(ClsStructure.EnvStruct _env, int _CamIdx)
         {
             InitializeComponent();
             Env = _env;
             Camidx = _CamIdx;
-            
+
             if (Camidx.Equals(1))
             {
                 IPCamInfo = Env.CameraEnv.IPCamera1Info;
@@ -55,11 +58,22 @@ namespace KyungsinLPR
             }
         }
 
+        // 서버캠(개별설정)용: 지정 이미지/현재 ROI 로 영역설정 (cam1/2 Path 의존 없음)
+        private Rectangle _explicitRoi;
+        public frmPicConfig(ClsStructure.EnvStruct _env, string _imagePath, Rectangle _roi)
+        {
+            InitializeComponent();
+            Env = _env;
+            Camidx = -1;            // 서버캠 모드
+            path = _imagePath ?? string.Empty;
+            _explicitRoi = _roi;
+        }
+
         private void frmPicConfig_Load(object sender, EventArgs e)
         {
             Bitmap bmp;
             Bitmap outbmp;
-            RoiRect = IPCamInfo.Roi;
+            RoiRect = (Camidx == -1) ? _explicitRoi : IPCamInfo.Roi;   // 서버캠은 명시 ROI
             //plate area
             if (File.Exists(path))
             {
@@ -98,13 +112,27 @@ namespace KyungsinLPR
                     Util.Logger.Log(string.Format("{0} {1} {2} {3}", PlateRect.X, PlateRect.Y, PlateRect.Width, PlateRect.Height));
                 }
                 bmp = new Bitmap(path);
-                //leess 사이즈 동적 변경
-                //outbmp = clsFunction.ResizeImage(bmp, 800, 600);
                 imgWidth = bmp.Width;
                 imgHeight = bmp.Height;
-                outbmp = clsFunction.ResizeImage(bmp, bmp.Width/2, bmp.Height/2);
+
+                // 화면 작업영역에 맞도록 표시 스케일 동적 계산 (기본 0.5, 큰 카메라는 더 축소)
+                var workArea = Screen.FromControl(this).WorkingArea;
+                int maxW = workArea.Width - 60;
+                int maxH = workArea.Height - 140; // 폼 헤더/버튼 영역 확보
+                _displayScale = 0.5;
+                if (bmp.Width * _displayScale > maxW || bmp.Height * _displayScale > maxH)
+                {
+                    double sw = (double)maxW / bmp.Width;
+                    double sh = (double)maxH / bmp.Height;
+                    _displayScale = Math.Min(sw, sh);
+                }
+                int newW = Math.Max(1, (int)(bmp.Width * _displayScale));
+                int newH = Math.Max(1, (int)(bmp.Height * _displayScale));
+                outbmp = clsFunction.ResizeImage(bmp, newW, newH);
                 pictureBox1.Image = outbmp;
                 sizecontrol(this, pictureBox1, outbmp);
+                this.Text = string.Format("사진설정(설정시 마우스 오른쪽클릭)  원본 {0}x{1}, 표시 {2}x{3} (×{4:F2})",
+                    bmp.Width, bmp.Height, newW, newH, _displayScale);
             }
             else
             {
@@ -151,6 +179,14 @@ namespace KyungsinLPR
 
             this.Width = pictureBox1.Width + 30;
             this.Height = pictureBox1.Height + pictureBox1.Top + 50;
+
+            // 화면 작업영역 초과 방지 — 그래도 넘으면 화면 fit
+            var wa = Screen.FromControl(this).WorkingArea;
+            if (this.Width > wa.Width) this.Width = wa.Width;
+            if (this.Height > wa.Height) this.Height = wa.Height;
+            this.StartPosition = FormStartPosition.Manual;
+            this.Location = new Point(wa.X + Math.Max(0, (wa.Width - this.Width) / 2),
+                                       wa.Y + Math.Max(0, (wa.Height - this.Height) / 2));
         }
 
         private void btnSaveClose_Click(object sender, EventArgs e)
@@ -211,13 +247,14 @@ namespace KyungsinLPR
 
                 g.DrawRectangle(new Pen(Color.Green, 4), new Rectangle(startX, startY, endX - startX, endY - startY));
 
-                RoiRect.X = startX * 2;
-                RoiRect.Y = startY * 2;
-                RoiRect.Width = (endX - startX) * 2;
-                RoiRect.Height = (endY - startY) * 2;
-                //roi = (startX * 2).ToString() + "," + (startY * 2).ToString() + "," + (endX*2 - startX*2).ToString() + "," + (endY*2 - startY*2).ToString();
-                roi = (startX).ToString() + "," + (startY).ToString() + "," + (endX - startX).ToString() + "," + (endY - startY).ToString();
-                this.Text = "사진설정(설정시 마우스 오른쪽클릭)" + roi;
+                // 표시 좌표 → 원본 픽셀 좌표 환산 (스케일 역수 적용)
+                double inv = (_displayScale > 0) ? 1.0 / _displayScale : 2.0;
+                RoiRect.X = (int)(startX * inv);
+                RoiRect.Y = (int)(startY * inv);
+                RoiRect.Width = (int)((endX - startX) * inv);
+                RoiRect.Height = (int)((endY - startY) * inv);
+                roi = string.Format("{0},{1},{2},{3}", RoiRect.X, RoiRect.Y, RoiRect.Width, RoiRect.Height);
+                this.Text = string.Format("사진설정 ROI(원본) {0}", roi);
             }
         }
 
@@ -266,8 +303,15 @@ namespace KyungsinLPR
             label4.Text = String.Format("Mouse Position X: {0}; Y: {1}", e.X, e.Y);
             using (Graphics g = pictureBox1.CreateGraphics())
             {
-                g.DrawRectangle(Pens.Red, RoiRect.X / 2, RoiRect.Y / 2, RoiRect.Width / 2, RoiRect.Height / 2);
-                g.DrawRectangle(Pens.Blue, PlateRect.X / 2, PlateRect.Y / 2, PlateRect.Width / 2, PlateRect.Height / 2);
+                // 원본 좌표(RoiRect) → 표시 좌표 환산 시 저장 시 사용한 _displayScale 적용.
+                // 기존 /2 고정 코드는 USB 5MP(2592x1944) 등 _displayScale≠0.5 카메라에서 어긋남.
+                double s = (_displayScale > 0) ? _displayScale : 0.5;
+                g.DrawRectangle(Pens.Red,
+                    (int)(RoiRect.X * s), (int)(RoiRect.Y * s),
+                    (int)(RoiRect.Width * s), (int)(RoiRect.Height * s));
+                g.DrawRectangle(Pens.Blue,
+                    (int)(PlateRect.X * s), (int)(PlateRect.Y * s),
+                    (int)(PlateRect.Width * s), (int)(PlateRect.Height * s));
             }
         }
 

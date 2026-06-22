@@ -48,6 +48,7 @@ namespace KyungsinLPR
         public string Penaltiment;
         public bool Ilotarea;
         public bool UseGroupGate = false;
+        public bool UseExitGroupGate = false;  // 출차장비도 그룹 제한 적용 여부 (기본 false → 입차장비만 제한)
         public int GateGroupNo = 0;
         public string[] GateGroupName;
         public string[] GroupMent;
@@ -130,6 +131,7 @@ namespace KyungsinLPR
                 info.Ilotarea = Util.Function.BoolTryParse(Util.Function.IniReadValue("REGCARCONTROL", "LotArea"));
 
                 info.UseGroupGate = Util.Function.BoolTryParse(Util.Function.IniReadValue("REGCARCONTROL", "GroupUSE"));
+                info.UseExitGroupGate = Util.Function.BoolTryParse(Util.Function.IniReadValue("REGCARCONTROL", "ExitGroupUSE"));
                 info.GateGroupNo = Util.Function.IntTryParse(Util.Function.IniReadValue("REGCARCONTROL", "GroupNo"));
 
                 info.GroupUseTime = Util.Function.BoolTryParse(Util.Function.IniReadValue("REGCARCONTROL", "GroupUseTime"));
@@ -213,6 +215,7 @@ namespace KyungsinLPR
             Util.Function.IniWriteValue("REGCARCONTROL", "LotArea", info.Ilotarea);
 
             Util.Function.IniWriteValue("REGCARCONTROL", "GroupUSE", info.UseGroupGate);
+            Util.Function.IniWriteValue("REGCARCONTROL", "ExitGroupUSE", info.UseExitGroupGate);
             Util.Function.IniWriteValue("REGCARCONTROL", "GroupNo", info.GateGroupNo);
             Util.Function.IniWriteValue("REGCARCONTROL", "GroupUseTime", info.GroupUseTime);
             Util.Function.IniWriteValue("REGCARCONTROL", "GroupTimeStart", info.GroupStart);

@@ -83,7 +83,9 @@
       <HintPath>bin\Debug\SerialDevice.dll</HintPath>
     </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Management" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
@@ -107,6 +109,7 @@
     <Compile Include="Class\clsBusinessCar.cs" />
     <Compile Include="Class\clsDataTransaction.cs" />
     <Compile Include="Class\clsFunction.cs" />
+    <Compile Include="Class\clsImageUploader.cs" />
     <Compile Include="Class\clsOutService.cs" />
     <Compile Include="Class\clsQuery.cs" />
     <Compile Include="Class\clsRegCarControl.cs" />
@@ -143,6 +146,7 @@
     <Compile Include="Class\RegModule\CoreLogic.cs" />
     <Compile Include="Class\RegModule\Elanpr.cs" />
     <Compile Include="Class\LprRelay.cs" />
+    <Compile Include="Class\ClsDingtian.cs" />
     <Compile Include="Class\NetWork Display\NetworkDisplay.cs" />
     <Compile Include="Class\RegModule\NgisWay.cs" />
     <Compile Include="Class\clsExceptGroup.cs" />
@@ -191,7 +195,8 @@
       <DependentUpon>AutoFlashConfigForm.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Class\iNova2\frmAdvFeature.resx">
-      <DependentUpon>frmAdvFeature.cs</DependentUpon>
+      <SubType>Designer</SubType>
+      <ManifestResourceName>KyungsinLPR.iNova2.frmAdvFeature</ManifestResourceName>
     </EmbeddedResource>
     <EmbeddedResource Include="Form\frmExposureCheck.resx">
       <DependentUpon>frmExposureCheck.cs</DependentUpon>

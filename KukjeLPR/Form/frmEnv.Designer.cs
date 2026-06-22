@@ -59,6 +59,8 @@
             this.rdbNoDriving2 = new System.Windows.Forms.RadioButton();
             this.chkTestMod = new System.Windows.Forms.CheckBox();
             this.groupBox11 = new System.Windows.Forms.GroupBox();
+            this.btnServerCams = new System.Windows.Forms.Button();
+            this.rdbServerMode = new System.Windows.Forms.RadioButton();
             this.rdStartBoth = new System.Windows.Forms.RadioButton();
             this.rdStartCom = new System.Windows.Forms.RadioButton();
             this.rdStartCam = new System.Windows.Forms.RadioButton();
@@ -97,11 +99,11 @@
             this.label16 = new System.Windows.Forms.Label();
             this.tabCam = new System.Windows.Forms.TabPage();
             this.cmbCameraType = new System.Windows.Forms.ComboBox();
-            this.label158 = new System.Windows.Forms.Label();
-            this.btnExposureCheck = new System.Windows.Forms.Button();
             this.chkCamUse = new System.Windows.Forms.CheckBox();
+            this.label158 = new System.Windows.Forms.Label();
             this.btnCam2 = new System.Windows.Forms.Button();
             this.btnCam1 = new System.Windows.Forms.Button();
+            this.btnExposureCheck = new System.Windows.Forms.Button();
             this.listCamIPlist = new System.Windows.Forms.ListBox();
             this.groupBox1 = new System.Windows.Forms.GroupBox();
             this.CamDetail = new System.Windows.Forms.GroupBox();
@@ -250,6 +252,7 @@
             this.rdTcpStream = new System.Windows.Forms.RadioButton();
             this.txtCamIp = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
+            this.usbCamPanel = new KyungsinLPR.UsbCamSettingPanel();
             this.tabLpr = new System.Windows.Forms.TabPage();
             this.gbLPRInfo = new System.Windows.Forms.GroupBox();
             this.btnLPRInfoPath2 = new System.Windows.Forms.Button();
@@ -293,6 +296,12 @@
             this.textBox1 = new System.Windows.Forms.TextBox();
             this.label43 = new System.Windows.Forms.Label();
             this.groupBox8 = new System.Windows.Forms.GroupBox();
+            this.lblRecogMode = new System.Windows.Forms.Label();
+            this.cmbRecogMode = new System.Windows.Forms.ComboBox();
+            this.lblRtsp1 = new System.Windows.Forms.Label();
+            this.txtRtsp1 = new System.Windows.Forms.TextBox();
+            this.lblRtsp2 = new System.Windows.Forms.Label();
+            this.txtRtsp2 = new System.Windows.Forms.TextBox();
             this.panel5 = new System.Windows.Forms.Panel();
             this.rdbTha = new System.Windows.Forms.RadioButton();
             this.rdbKor = new System.Windows.Forms.RadioButton();
@@ -303,6 +312,7 @@
             this.rdbGpu = new System.Windows.Forms.RadioButton();
             this.rdbMyriad = new System.Windows.Forms.RadioButton();
             this.rdbCore = new System.Windows.Forms.RadioButton();
+            this.rdbOptionK = new System.Windows.Forms.RadioButton();
             this.rdNgis = new System.Windows.Forms.RadioButton();
             this.rdElwox = new System.Windows.Forms.RadioButton();
             this.cmbImageProcType = new System.Windows.Forms.ComboBox();
@@ -356,6 +366,15 @@
             this.rdN = new System.Windows.Forms.RadioButton();
             this.rdA = new System.Windows.Forms.RadioButton();
             this.rdK = new System.Windows.Forms.RadioButton();
+            this.gbUpload = new System.Windows.Forms.GroupBox();
+            this.chkOcrRemote = new System.Windows.Forms.CheckBox();
+            this.chkOcrRemoteNoUpload = new System.Windows.Forms.CheckBox();
+            this.chkUploadEnabled = new System.Windows.Forms.CheckBox();
+            this.lblUploadUrl = new System.Windows.Forms.Label();
+            this.txtUploadServerUrl = new System.Windows.Forms.TextBox();
+            this.lblUploadKey = new System.Windows.Forms.Label();
+            this.txtUploadApiKey = new System.Windows.Forms.TextBox();
+            this.lblUploadHint = new System.Windows.Forms.Label();
             this.tabGate = new System.Windows.Forms.TabPage();
             this.groupBox13 = new System.Windows.Forms.GroupBox();
             this.button6 = new System.Windows.Forms.Button();
@@ -604,6 +623,7 @@
             this.txtBlackDisplayRegText1 = new System.Windows.Forms.TextBox();
             this.tabPage5 = new System.Windows.Forms.TabPage();
             this.chkGateGroupUse = new System.Windows.Forms.CheckBox();
+            this.chkExitGroupGateUse = new System.Windows.Forms.CheckBox();
             this.groupBox33 = new System.Windows.Forms.GroupBox();
             this.label157 = new System.Windows.Forms.Label();
             this.txtGroupMent = new System.Windows.Forms.TextBox();
@@ -718,6 +738,7 @@
             this.gbStone.SuspendLayout();
             this.gbNoti.SuspendLayout();
             this.groupBox9.SuspendLayout();
+            this.gbUpload.SuspendLayout();
             this.tabGate.SuspendLayout();
             this.groupBox13.SuspendLayout();
             this.gbPass.SuspendLayout();
@@ -781,7 +802,7 @@
             this.tabControl1.Location = new System.Drawing.Point(13, 34);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(752, 486);
+            this.tabControl1.Size = new System.Drawing.Size(752, 539);
             this.tabControl1.TabIndex = 141;
             this.tabControl1.SelectedIndexChanged += new System.EventHandler(this.tabControl1_SelectedIndexChanged);
             this.tabControl1.TabIndexChanged += new System.EventHandler(this.tabControl1_TabIndexChanged);
@@ -806,7 +827,7 @@
             this.tabBaisc.Controls.Add(this.pnlDbInfo);
             this.tabBaisc.Location = new System.Drawing.Point(4, 22);
             this.tabBaisc.Name = "tabBaisc";
-            this.tabBaisc.Size = new System.Drawing.Size(744, 460);
+            this.tabBaisc.Size = new System.Drawing.Size(744, 513);
             this.tabBaisc.TabIndex = 5;
             this.tabBaisc.Text = "기본설정";
             // 
@@ -1084,6 +1105,8 @@
             // 
             // groupBox11
             // 
+            this.groupBox11.Controls.Add(this.btnServerCams);
+            this.groupBox11.Controls.Add(this.rdbServerMode);
             this.groupBox11.Controls.Add(this.rdStartBoth);
             this.groupBox11.Controls.Add(this.rdStartCom);
             this.groupBox11.Controls.Add(this.rdStartCam);
@@ -1091,10 +1114,31 @@
             this.groupBox11.ImeMode = System.Windows.Forms.ImeMode.Alpha;
             this.groupBox11.Location = new System.Drawing.Point(14, 362);
             this.groupBox11.Name = "groupBox11";
-            this.groupBox11.Size = new System.Drawing.Size(173, 89);
+            this.groupBox11.Size = new System.Drawing.Size(190, 144);
             this.groupBox11.TabIndex = 143;
             this.groupBox11.TabStop = false;
             this.groupBox11.Text = "동작모드(공통)";
+            // 
+            // btnServerCams
+            // 
+            this.btnServerCams.Location = new System.Drawing.Point(8, 110);
+            this.btnServerCams.Name = "btnServerCams";
+            this.btnServerCams.Size = new System.Drawing.Size(150, 26);
+            this.btnServerCams.TabIndex = 5;
+            this.btnServerCams.Text = "서버 카메라 설정...";
+            this.btnServerCams.UseVisualStyleBackColor = true;
+            this.btnServerCams.Click += new System.EventHandler(this.btnServerCams_Click);
+            // 
+            // rdbServerMode
+            //
+            this.rdbServerMode.AutoSize = true;
+            this.rdbServerMode.ForeColor = System.Drawing.Color.Blue;
+            this.rdbServerMode.Location = new System.Drawing.Point(8, 88);
+            this.rdbServerMode.Name = "rdbServerMode";
+            this.rdbServerMode.Size = new System.Drawing.Size(162, 16);
+            this.rdbServerMode.TabIndex = 4;
+            this.rdbServerMode.Text = "서버모드 (서버에서 인식)";
+            this.rdbServerMode.UseVisualStyleBackColor = true;
             // 
             // rdStartBoth
             // 
@@ -1122,7 +1166,6 @@
             // rdStartCam
             // 
             this.rdStartCam.AutoSize = true;
-            this.rdStartCam.Enabled = false;
             this.rdStartCam.Location = new System.Drawing.Point(8, 20);
             this.rdStartCam.Name = "rdStartCam";
             this.rdStartCam.Size = new System.Drawing.Size(87, 16);
@@ -1461,17 +1504,18 @@
             // 
             this.tabCam.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
             this.tabCam.Controls.Add(this.cmbCameraType);
-            this.tabCam.Controls.Add(this.label158);
-            this.tabCam.Controls.Add(this.btnExposureCheck);
             this.tabCam.Controls.Add(this.chkCamUse);
+            this.tabCam.Controls.Add(this.label158);
             this.tabCam.Controls.Add(this.btnCam2);
             this.tabCam.Controls.Add(this.btnCam1);
+            this.tabCam.Controls.Add(this.btnExposureCheck);
             this.tabCam.Controls.Add(this.listCamIPlist);
             this.tabCam.Controls.Add(this.groupBox1);
+            this.tabCam.Controls.Add(this.usbCamPanel);
             this.tabCam.Location = new System.Drawing.Point(4, 22);
             this.tabCam.Name = "tabCam";
             this.tabCam.Padding = new System.Windows.Forms.Padding(3);
-            this.tabCam.Size = new System.Drawing.Size(744, 460);
+            this.tabCam.Size = new System.Drawing.Size(744, 482);
             this.tabCam.TabIndex = 1;
             this.tabCam.Text = "카메라설정";
             // 
@@ -1481,46 +1525,36 @@
             this.cmbCameraType.Items.AddRange(new object[] {
             "iNova1",
             "iNova2"});
-            this.cmbCameraType.Location = new System.Drawing.Point(636, 25);
+            this.cmbCameraType.Location = new System.Drawing.Point(332, 28);
             this.cmbCameraType.Name = "cmbCameraType";
             this.cmbCameraType.Size = new System.Drawing.Size(85, 20);
             this.cmbCameraType.TabIndex = 148;
             this.cmbCameraType.SelectedIndexChanged += new System.EventHandler(this.cmbCameraType_SelectedIndexChanged);
-            // 
-            // label158
-            // 
-            this.label158.AutoSize = true;
-            this.label158.Location = new System.Drawing.Point(571, 30);
-            this.label158.Name = "label158";
-            this.label158.Size = new System.Drawing.Size(65, 12);
-            this.label158.TabIndex = 147;
-            this.label158.Text = "카메라종류";
-            // 
-            // btnExposureCheck
-            // 
-            this.btnExposureCheck.Location = new System.Drawing.Point(362, 25);
-            this.btnExposureCheck.Name = "btnExposureCheck";
-            this.btnExposureCheck.Size = new System.Drawing.Size(128, 23);
-            this.btnExposureCheck.TabIndex = 146;
-            this.btnExposureCheck.Text = "Exposure Check";
-            this.btnExposureCheck.UseVisualStyleBackColor = true;
-            this.btnExposureCheck.Click += new System.EventHandler(this.btnExposureCheck_Click);
             // 
             // chkCamUse
             // 
             this.chkCamUse.AutoSize = true;
             this.chkCamUse.Checked = true;
             this.chkCamUse.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.chkCamUse.Location = new System.Drawing.Point(111, 43);
+            this.chkCamUse.Location = new System.Drawing.Point(111, 81);
             this.chkCamUse.Name = "chkCamUse";
             this.chkCamUse.Size = new System.Drawing.Size(15, 14);
             this.chkCamUse.TabIndex = 142;
             this.chkCamUse.UseVisualStyleBackColor = true;
             this.chkCamUse.CheckedChanged += new System.EventHandler(this.chkCamUse_CheckedChanged);
             // 
+            // label158
+            // 
+            this.label158.AutoSize = true;
+            this.label158.Location = new System.Drawing.Point(266, 31);
+            this.label158.Name = "label158";
+            this.label158.Size = new System.Drawing.Size(65, 12);
+            this.label158.TabIndex = 147;
+            this.label158.Text = "카메라종류";
+            // 
             // btnCam2
             // 
-            this.btnCam2.Location = new System.Drawing.Point(87, 14);
+            this.btnCam2.Location = new System.Drawing.Point(82, 26);
             this.btnCam2.Name = "btnCam2";
             this.btnCam2.Size = new System.Drawing.Size(75, 23);
             this.btnCam2.TabIndex = 145;
@@ -1530,7 +1564,7 @@
             // 
             // btnCam1
             // 
-            this.btnCam1.Location = new System.Drawing.Point(6, 14);
+            this.btnCam1.Location = new System.Drawing.Point(6, 26);
             this.btnCam1.Name = "btnCam1";
             this.btnCam1.Size = new System.Drawing.Size(75, 23);
             this.btnCam1.TabIndex = 144;
@@ -1538,13 +1572,23 @@
             this.btnCam1.UseVisualStyleBackColor = true;
             this.btnCam1.Click += new System.EventHandler(this.btnCam1_Click);
             // 
+            // btnExposureCheck
+            // 
+            this.btnExposureCheck.Location = new System.Drawing.Point(269, 60);
+            this.btnExposureCheck.Name = "btnExposureCheck";
+            this.btnExposureCheck.Size = new System.Drawing.Size(128, 23);
+            this.btnExposureCheck.TabIndex = 146;
+            this.btnExposureCheck.Text = "Exposure Check";
+            this.btnExposureCheck.UseVisualStyleBackColor = true;
+            this.btnExposureCheck.Click += new System.EventHandler(this.btnExposureCheck_Click);
+            // 
             // listCamIPlist
             // 
             this.listCamIPlist.FormattingEnabled = true;
             this.listCamIPlist.ItemHeight = 12;
-            this.listCamIPlist.Location = new System.Drawing.Point(236, 6);
+            this.listCamIPlist.Location = new System.Drawing.Point(160, 15);
             this.listCamIPlist.Name = "listCamIPlist";
-            this.listCamIPlist.Size = new System.Drawing.Size(120, 40);
+            this.listCamIPlist.Size = new System.Drawing.Size(99, 64);
             this.listCamIPlist.TabIndex = 143;
             this.listCamIPlist.DoubleClick += new System.EventHandler(this.listCamIPlist_DoubleClick);
             // 
@@ -1558,7 +1602,7 @@
             this.groupBox1.Controls.Add(this.tabControl);
             this.groupBox1.Controls.Add(this.groupBox2);
             this.groupBox1.Controls.Add(this.CamName);
-            this.groupBox1.Location = new System.Drawing.Point(6, 43);
+            this.groupBox1.Location = new System.Drawing.Point(6, 79);
             this.groupBox1.Name = "groupBox1";
             this.groupBox1.Size = new System.Drawing.Size(728, 399);
             this.groupBox1.TabIndex = 141;
@@ -3092,6 +3136,15 @@
             this.label1.TabIndex = 7;
             this.label1.Text = "카메라 IP";
             // 
+            // usbCamPanel
+            // 
+            this.usbCamPanel.BackColor = System.Drawing.Color.Gold;
+            this.usbCamPanel.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.usbCamPanel.Location = new System.Drawing.Point(423, 21);
+            this.usbCamPanel.Name = "usbCamPanel";
+            this.usbCamPanel.Size = new System.Drawing.Size(315, 35);
+            this.usbCamPanel.TabIndex = 200;
+            // 
             // tabLpr
             // 
             this.tabLpr.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
@@ -3103,7 +3156,7 @@
             this.tabLpr.Location = new System.Drawing.Point(4, 22);
             this.tabLpr.Name = "tabLpr";
             this.tabLpr.Padding = new System.Windows.Forms.Padding(3);
-            this.tabLpr.Size = new System.Drawing.Size(744, 460);
+            this.tabLpr.Size = new System.Drawing.Size(744, 482);
             this.tabLpr.TabIndex = 0;
             this.tabLpr.Text = "LPR설정";
             // 
@@ -3478,7 +3531,7 @@
             this.gbAuthentication.Controls.Add(this.button1);
             this.gbAuthentication.Controls.Add(this.textBox1);
             this.gbAuthentication.Controls.Add(this.label43);
-            this.gbAuthentication.Location = new System.Drawing.Point(578, 378);
+            this.gbAuthentication.Location = new System.Drawing.Point(578, 396);
             this.gbAuthentication.Name = "gbAuthentication";
             this.gbAuthentication.Size = new System.Drawing.Size(163, 82);
             this.gbAuthentication.TabIndex = 135;
@@ -3513,21 +3566,81 @@
             // 
             // groupBox8
             // 
+            this.groupBox8.Controls.Add(this.lblRecogMode);
+            this.groupBox8.Controls.Add(this.cmbRecogMode);
+            this.groupBox8.Controls.Add(this.lblRtsp1);
+            this.groupBox8.Controls.Add(this.txtRtsp1);
+            this.groupBox8.Controls.Add(this.lblRtsp2);
+            this.groupBox8.Controls.Add(this.txtRtsp2);
             this.groupBox8.Controls.Add(this.panel5);
             this.groupBox8.Controls.Add(this.dataGridView1);
             this.groupBox8.Controls.Add(this.chkRegCarType);
             this.groupBox8.Controls.Add(this.panel1);
             this.groupBox8.Controls.Add(this.rdbCore);
+            this.groupBox8.Controls.Add(this.rdbOptionK);
             this.groupBox8.Controls.Add(this.rdNgis);
             this.groupBox8.Controls.Add(this.rdElwox);
             this.groupBox8.Controls.Add(this.cmbImageProcType);
             this.groupBox8.Controls.Add(this.label17);
             this.groupBox8.Location = new System.Drawing.Point(412, 6);
             this.groupBox8.Name = "groupBox8";
-            this.groupBox8.Size = new System.Drawing.Size(272, 396);
+            this.groupBox8.Size = new System.Drawing.Size(326, 415);
             this.groupBox8.TabIndex = 134;
             this.groupBox8.TabStop = false;
             this.groupBox8.Text = "인식모듈 선택(CAM)";
+            // 
+            // lblRecogMode
+            // 
+            this.lblRecogMode.AutoSize = true;
+            this.lblRecogMode.Location = new System.Drawing.Point(8, 315);
+            this.lblRecogMode.Name = "lblRecogMode";
+            this.lblRecogMode.Size = new System.Drawing.Size(61, 12);
+            this.lblRecogMode.TabIndex = 200;
+            this.lblRecogMode.Text = "인식 방식:";
+            // 
+            // cmbRecogMode
+            // 
+            this.cmbRecogMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbRecogMode.FormattingEnabled = true;
+            this.cmbRecogMode.Items.AddRange(new object[] {
+            "스트로브 방식",
+            "동영상 방식(FAVEngine)"});
+            this.cmbRecogMode.Location = new System.Drawing.Point(87, 312);
+            this.cmbRecogMode.Name = "cmbRecogMode";
+            this.cmbRecogMode.Size = new System.Drawing.Size(231, 20);
+            this.cmbRecogMode.TabIndex = 201;
+            // 
+            // lblRtsp1
+            // 
+            this.lblRtsp1.AutoSize = true;
+            this.lblRtsp1.Location = new System.Drawing.Point(4, 340);
+            this.lblRtsp1.Name = "lblRtsp1";
+            this.lblRtsp1.Size = new System.Drawing.Size(79, 12);
+            this.lblRtsp1.TabIndex = 202;
+            this.lblRtsp1.Text = "CAM1 RTSP:";
+            // 
+            // txtRtsp1
+            // 
+            this.txtRtsp1.Location = new System.Drawing.Point(88, 337);
+            this.txtRtsp1.Name = "txtRtsp1";
+            this.txtRtsp1.Size = new System.Drawing.Size(229, 21);
+            this.txtRtsp1.TabIndex = 203;
+            // 
+            // lblRtsp2
+            // 
+            this.lblRtsp2.AutoSize = true;
+            this.lblRtsp2.Location = new System.Drawing.Point(4, 365);
+            this.lblRtsp2.Name = "lblRtsp2";
+            this.lblRtsp2.Size = new System.Drawing.Size(79, 12);
+            this.lblRtsp2.TabIndex = 204;
+            this.lblRtsp2.Text = "CAM2 RTSP:";
+            // 
+            // txtRtsp2
+            // 
+            this.txtRtsp2.Location = new System.Drawing.Point(88, 362);
+            this.txtRtsp2.Name = "txtRtsp2";
+            this.txtRtsp2.Size = new System.Drawing.Size(228, 21);
+            this.txtRtsp2.TabIndex = 205;
             // 
             // panel5
             // 
@@ -3563,7 +3676,7 @@
             // dataGridView1
             // 
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridView1.Location = new System.Drawing.Point(6, 155);
+            this.dataGridView1.Location = new System.Drawing.Point(6, 183);
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.RowTemplate.Height = 23;
             this.dataGridView1.Size = new System.Drawing.Size(260, 122);
@@ -3572,7 +3685,7 @@
             // chkRegCarType
             // 
             this.chkRegCarType.AutoSize = true;
-            this.chkRegCarType.Location = new System.Drawing.Point(6, 135);
+            this.chkRegCarType.Location = new System.Drawing.Point(6, 157);
             this.chkRegCarType.Name = "chkRegCarType";
             this.chkRegCarType.Size = new System.Drawing.Size(72, 16);
             this.chkRegCarType.TabIndex = 138;
@@ -3586,7 +3699,7 @@
             this.panel1.Controls.Add(this.rdbGpu);
             this.panel1.Controls.Add(this.rdbMyriad);
             this.panel1.Enabled = false;
-            this.panel1.Location = new System.Drawing.Point(24, 86);
+            this.panel1.Location = new System.Drawing.Point(24, 109);
             this.panel1.Name = "panel1";
             this.panel1.Size = new System.Drawing.Size(236, 32);
             this.panel1.TabIndex = 152;
@@ -3637,6 +3750,17 @@
             this.rdbCore.UseVisualStyleBackColor = true;
             this.rdbCore.Visible = false;
             this.rdbCore.CheckedChanged += new System.EventHandler(this.rdbCore_CheckedChanged);
+            // 
+            // rdbOptionK
+            // 
+            this.rdbOptionK.AutoSize = true;
+            this.rdbOptionK.Location = new System.Drawing.Point(6, 87);
+            this.rdbOptionK.Name = "rdbOptionK";
+            this.rdbOptionK.Size = new System.Drawing.Size(77, 16);
+            this.rdbOptionK.TabIndex = 152;
+            this.rdbOptionK.Text = "Option(K)";
+            this.rdbOptionK.UseVisualStyleBackColor = true;
+            this.rdbOptionK.Visible = false;
             // 
             // rdNgis
             // 
@@ -3803,9 +3927,10 @@
             this.tabSocket.Controls.Add(this.gbStone);
             this.tabSocket.Controls.Add(this.gbNoti);
             this.tabSocket.Controls.Add(this.groupBox9);
+            this.tabSocket.Controls.Add(this.gbUpload);
             this.tabSocket.Location = new System.Drawing.Point(4, 22);
             this.tabSocket.Name = "tabSocket";
-            this.tabSocket.Size = new System.Drawing.Size(744, 460);
+            this.tabSocket.Size = new System.Drawing.Size(744, 482);
             this.tabSocket.TabIndex = 2;
             this.tabSocket.Text = "소켓통신";
             // 
@@ -4175,15 +4300,107 @@
             this.rdK.Text = "KUKJE";
             this.rdK.UseVisualStyleBackColor = true;
             // 
-            // tabGate
+            // gbUpload
             // 
+            this.gbUpload.Controls.Add(this.chkUploadEnabled);
+            this.gbUpload.Controls.Add(this.lblUploadUrl);
+            this.gbUpload.Controls.Add(this.txtUploadServerUrl);
+            this.gbUpload.Controls.Add(this.lblUploadKey);
+            this.gbUpload.Controls.Add(this.txtUploadApiKey);
+            this.gbUpload.Controls.Add(this.lblUploadHint);
+            this.gbUpload.Controls.Add(this.chkOcrRemote);
+            this.gbUpload.Controls.Add(this.chkOcrRemoteNoUpload);
+            this.gbUpload.Location = new System.Drawing.Point(220, 215);
+            this.gbUpload.Name = "gbUpload";
+            this.gbUpload.Size = new System.Drawing.Size(410, 210);
+            this.gbUpload.TabIndex = 99;
+            this.gbUpload.TabStop = false;
+            this.gbUpload.Text = "이미지 업로드 (ParkingWeb)";
+            // 
+            // chkUploadEnabled
+            // 
+            this.chkUploadEnabled.AutoSize = true;
+            this.chkUploadEnabled.Location = new System.Drawing.Point(15, 22);
+            this.chkUploadEnabled.Name = "chkUploadEnabled";
+            this.chkUploadEnabled.Size = new System.Drawing.Size(48, 16);
+            this.chkUploadEnabled.TabIndex = 0;
+            this.chkUploadEnabled.Text = "사용";
+            this.chkUploadEnabled.UseVisualStyleBackColor = true;
+            // 
+            // lblUploadUrl
+            // 
+            this.lblUploadUrl.AutoSize = true;
+            this.lblUploadUrl.Location = new System.Drawing.Point(15, 52);
+            this.lblUploadUrl.Name = "lblUploadUrl";
+            this.lblUploadUrl.Size = new System.Drawing.Size(60, 12);
+            this.lblUploadUrl.TabIndex = 1;
+            this.lblUploadUrl.Text = "서버 URL:";
+            // 
+            // txtUploadServerUrl
+            // 
+            this.txtUploadServerUrl.Location = new System.Drawing.Point(85, 49);
+            this.txtUploadServerUrl.Name = "txtUploadServerUrl";
+            this.txtUploadServerUrl.Size = new System.Drawing.Size(300, 21);
+            this.txtUploadServerUrl.TabIndex = 1;
+            // 
+            // lblUploadKey
+            // 
+            this.lblUploadKey.AutoSize = true;
+            this.lblUploadKey.Location = new System.Drawing.Point(15, 80);
+            this.lblUploadKey.Name = "lblUploadKey";
+            this.lblUploadKey.Size = new System.Drawing.Size(44, 12);
+            this.lblUploadKey.TabIndex = 2;
+            this.lblUploadKey.Text = "API 키:";
+            // 
+            // txtUploadApiKey
+            // 
+            this.txtUploadApiKey.Location = new System.Drawing.Point(85, 77);
+            this.txtUploadApiKey.Name = "txtUploadApiKey";
+            this.txtUploadApiKey.Size = new System.Drawing.Size(300, 21);
+            this.txtUploadApiKey.TabIndex = 2;
+            // 
+            // lblUploadHint
+            // 
+            this.lblUploadHint.AutoSize = true;
+            this.lblUploadHint.ForeColor = System.Drawing.Color.DimGray;
+            this.lblUploadHint.Location = new System.Drawing.Point(15, 108);
+            this.lblUploadHint.Name = "lblUploadHint";
+            this.lblUploadHint.Size = new System.Drawing.Size(314, 12);
+            this.lblUploadHint.TabIndex = 3;
+            this.lblUploadHint.Text = "예: http://192.168.1.3:18100   (ParkingWeb 서버 IP:포트)";
+            //
+            // chkOcrRemote
+            //
+            this.chkOcrRemote.AutoSize = true;
+            this.chkOcrRemote.ForeColor = System.Drawing.Color.Blue;
+            this.chkOcrRemote.Location = new System.Drawing.Point(15, 135);
+            this.chkOcrRemote.Name = "chkOcrRemote";
+            this.chkOcrRemote.Size = new System.Drawing.Size(243, 16);
+            this.chkOcrRemote.TabIndex = 10;
+            this.chkOcrRemote.Text = "원격 차번인식 사용 (Option K: 서버에서 인식)";
+            this.chkOcrRemote.UseVisualStyleBackColor = true;
+            //
+            // chkOcrRemoteNoUpload
+            //
+            this.chkOcrRemoteNoUpload.AutoSize = true;
+            this.chkOcrRemoteNoUpload.Enabled = false;
+            this.chkOcrRemoteNoUpload.ForeColor = System.Drawing.Color.DarkRed;
+            this.chkOcrRemoteNoUpload.Location = new System.Drawing.Point(32, 162);
+            this.chkOcrRemoteNoUpload.Name = "chkOcrRemoteNoUpload";
+            this.chkOcrRemoteNoUpload.Size = new System.Drawing.Size(229, 16);
+            this.chkOcrRemoteNoUpload.TabIndex = 11;
+            this.chkOcrRemoteNoUpload.Text = "원격 차번인식만 사용 (이미지 업로드 안함)";
+            this.chkOcrRemoteNoUpload.UseVisualStyleBackColor = true;
+            //
+            // tabGate
+            //
             this.tabGate.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
             this.tabGate.Controls.Add(this.groupBox13);
             this.tabGate.Controls.Add(this.gbPass);
             this.tabGate.Controls.Add(this.groupBox6);
             this.tabGate.Location = new System.Drawing.Point(4, 22);
             this.tabGate.Name = "tabGate";
-            this.tabGate.Size = new System.Drawing.Size(744, 460);
+            this.tabGate.Size = new System.Drawing.Size(744, 482);
             this.tabGate.TabIndex = 3;
             this.tabGate.Text = "차단기 설정";
             // 
@@ -4206,7 +4423,7 @@
             this.groupBox13.Controls.Add(this.txtIsolateDelay);
             this.groupBox13.Controls.Add(this.cmbIsolateOutport);
             this.groupBox13.Controls.Add(this.chkIsolateUse);
-            this.groupBox13.Location = new System.Drawing.Point(12, 308);
+            this.groupBox13.Location = new System.Drawing.Point(12, 352);
             this.groupBox13.Name = "groupBox13";
             this.groupBox13.Size = new System.Drawing.Size(567, 101);
             this.groupBox13.TabIndex = 50;
@@ -4388,7 +4605,7 @@
             this.gbPass.Controls.Add(this.ChkGate1Use);
             this.gbPass.Controls.Add(this.label74);
             this.gbPass.Controls.Add(this.label77);
-            this.gbPass.Location = new System.Drawing.Point(12, 166);
+            this.gbPass.Location = new System.Drawing.Point(12, 206);
             this.gbPass.Name = "gbPass";
             this.gbPass.Size = new System.Drawing.Size(473, 136);
             this.gbPass.TabIndex = 130;
@@ -4610,7 +4827,7 @@
             this.groupBox6.Controls.Add(this.txtDioSetting);
             this.groupBox6.Location = new System.Drawing.Point(12, 13);
             this.groupBox6.Name = "groupBox6";
-            this.groupBox6.Size = new System.Drawing.Size(215, 127);
+            this.groupBox6.Size = new System.Drawing.Size(473, 187);
             this.groupBox6.TabIndex = 129;
             this.groupBox6.TabStop = false;
             this.groupBox6.Text = "차단기 통신 설정";
@@ -4707,7 +4924,7 @@
             this.tabDisplay.Controls.Add(this.gbNeon);
             this.tabDisplay.Location = new System.Drawing.Point(4, 22);
             this.tabDisplay.Name = "tabDisplay";
-            this.tabDisplay.Size = new System.Drawing.Size(744, 460);
+            this.tabDisplay.Size = new System.Drawing.Size(744, 482);
             this.tabDisplay.TabIndex = 7;
             this.tabDisplay.Text = "전광판 설정";
             // 
@@ -5505,7 +5722,7 @@
             this.tabDataProcessOption.Location = new System.Drawing.Point(4, 22);
             this.tabDataProcessOption.Name = "tabDataProcessOption";
             this.tabDataProcessOption.Padding = new System.Windows.Forms.Padding(3);
-            this.tabDataProcessOption.Size = new System.Drawing.Size(744, 460);
+            this.tabDataProcessOption.Size = new System.Drawing.Size(744, 482);
             this.tabDataProcessOption.TabIndex = 6;
             this.tabDataProcessOption.Text = "입출차 처리 옵션";
             // 
@@ -6264,7 +6481,7 @@
             this.tabPage4.Location = new System.Drawing.Point(4, 22);
             this.tabPage4.Name = "tabPage4";
             this.tabPage4.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage4.Size = new System.Drawing.Size(744, 460);
+            this.tabPage4.Size = new System.Drawing.Size(744, 482);
             this.tabPage4.TabIndex = 8;
             this.tabPage4.Text = "블랙리스트 설정";
             // 
@@ -6613,6 +6830,7 @@
             // 
             this.tabPage5.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
             this.tabPage5.Controls.Add(this.chkGateGroupUse);
+            this.tabPage5.Controls.Add(this.chkExitGroupGateUse);
             this.tabPage5.Controls.Add(this.groupBox33);
             this.tabPage5.Controls.Add(this.chkusePenalty);
             this.tabPage5.Controls.Add(this.groupBox32);
@@ -6628,7 +6846,7 @@
             this.tabPage5.Location = new System.Drawing.Point(4, 22);
             this.tabPage5.Name = "tabPage5";
             this.tabPage5.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage5.Size = new System.Drawing.Size(744, 460);
+            this.tabPage5.Size = new System.Drawing.Size(744, 482);
             this.tabPage5.TabIndex = 9;
             this.tabPage5.Text = "정기권관리";
             // 
@@ -6642,6 +6860,16 @@
             this.chkGateGroupUse.Text = "차단기 그룹 제한 사용 ";
             this.chkGateGroupUse.UseVisualStyleBackColor = true;
             this.chkGateGroupUse.CheckedChanged += new System.EventHandler(this.chkGateGroupUse_CheckedChanged);
+            // 
+            // chkExitGroupGateUse
+            // 
+            this.chkExitGroupGateUse.AutoSize = true;
+            this.chkExitGroupGateUse.Location = new System.Drawing.Point(496, 48);
+            this.chkExitGroupGateUse.Name = "chkExitGroupGateUse";
+            this.chkExitGroupGateUse.Size = new System.Drawing.Size(100, 16);
+            this.chkExitGroupGateUse.TabIndex = 1;
+            this.chkExitGroupGateUse.Text = "출차장비 제한";
+            this.chkExitGroupGateUse.UseVisualStyleBackColor = true;
             // 
             // groupBox33
             // 
@@ -7055,7 +7283,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(172)))), ((int)(((byte)(220)))), ((int)(((byte)(244)))));
-            this.ClientSize = new System.Drawing.Size(767, 522);
+            this.ClientSize = new System.Drawing.Size(767, 575);
             this.Controls.Add(this.button5);
             this.Controls.Add(this.btnEnvSave);
             this.Controls.Add(this.tabControl1);
@@ -7175,6 +7403,8 @@
             this.gbNoti.PerformLayout();
             this.groupBox9.ResumeLayout(false);
             this.groupBox9.PerformLayout();
+            this.gbUpload.ResumeLayout(false);
+            this.gbUpload.PerformLayout();
             this.tabGate.ResumeLayout(false);
             this.groupBox13.ResumeLayout(false);
             this.groupBox13.PerformLayout();
@@ -7262,6 +7492,7 @@
         private System.Windows.Forms.Button btnCam2;
         private System.Windows.Forms.Button btnCam1;
         private System.Windows.Forms.ListBox listCamIPlist;
+        private KyungsinLPR.UsbCamSettingPanel usbCamPanel;
         private System.Windows.Forms.GroupBox groupBox1;
         private System.Windows.Forms.Panel panel4;
         private System.Windows.Forms.Label label25;
@@ -7391,6 +7622,12 @@
         private System.Windows.Forms.ComboBox cmbChName;
         private System.Windows.Forms.Label label26;
         private System.Windows.Forms.GroupBox groupBox8;
+        private System.Windows.Forms.Label lblRecogMode;
+        private System.Windows.Forms.ComboBox cmbRecogMode;
+        private System.Windows.Forms.Label lblRtsp1;
+        private System.Windows.Forms.TextBox txtRtsp1;
+        private System.Windows.Forms.Label lblRtsp2;
+        private System.Windows.Forms.TextBox txtRtsp2;
         private System.Windows.Forms.RadioButton rdNgis;
         private System.Windows.Forms.RadioButton rdElwox;
         private System.Windows.Forms.GroupBox gbAuthentication;
@@ -7421,6 +7658,17 @@
         private System.Windows.Forms.ComboBox cmbBrakectCnt;
         private System.Windows.Forms.Label label47;
         private System.Windows.Forms.TabPage tabSocket;
+        private System.Windows.Forms.GroupBox gbUpload;
+        private System.Windows.Forms.CheckBox chkOcrRemote;
+        private System.Windows.Forms.CheckBox chkOcrRemoteNoUpload;
+        private System.Windows.Forms.CheckBox chkUploadEnabled;
+        private System.Windows.Forms.RadioButton rdbServerMode;
+        private System.Windows.Forms.Button btnServerCams;
+        private System.Windows.Forms.Label lblUploadUrl;
+        private System.Windows.Forms.TextBox txtUploadServerUrl;
+        private System.Windows.Forms.Label lblUploadKey;
+        private System.Windows.Forms.TextBox txtUploadApiKey;
+        private System.Windows.Forms.Label lblUploadHint;
         private System.Windows.Forms.GroupBox groupBox9;
         private System.Windows.Forms.RadioButton rdN;
         private System.Windows.Forms.RadioButton rdA;
@@ -7763,6 +8011,7 @@
         private System.Windows.Forms.TextBox txtDisplay1NetPort;
         private System.Windows.Forms.TextBox txtDisplay1NetIp;
         private System.Windows.Forms.RadioButton rdbCore;
+        private System.Windows.Forms.RadioButton rdbOptionK;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.RadioButton rdbCpu;
         private System.Windows.Forms.RadioButton rdbGpu;
@@ -7836,6 +8085,7 @@
         private System.Windows.Forms.TextBox txtPenaltyment;
         private System.Windows.Forms.Label label153;
         private System.Windows.Forms.CheckBox chkGateGroupUse;
+        private System.Windows.Forms.CheckBox chkExitGroupGateUse;
         private System.Windows.Forms.GroupBox groupBox33;
         private System.Windows.Forms.TextBox txtGroupNo;
         private System.Windows.Forms.Label label154;

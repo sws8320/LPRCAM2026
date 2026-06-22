@@ -77,8 +77,8 @@ namespace KyungsinLPR
                     Util.clsMssql.Dbinfo.pw = _dbinfo.Pw;
                     Util.clsMssql.Dbinfo.db = _dbinfo.TrnsDb;
                     SqlConnection Conn = Util.clsMssql.OpenDB();
-                    //string sql = string.Format("select stay from {0}.dbo.fc_stay where iExtendLotarea = {1} and iLotArea = {1} and iClient = {2}", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, extno, client);
-                    string sql = string.Format("select stay from {0}.dbo.fc_stay where iExtendLotarea = {1} and iLotArea = {1} and iClient = 0", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, extno, client);
+                    // iClient는 무시하고 iLotArea만 체크 (clsQuery.SetEntrance/ExitFcStay와 일관성)
+                    string sql = string.Format("select stay from {0}.dbo.fc_stay where iLotArea = {1}", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, extno);
                     DataTable dt = Util.clsMssql.GetTable(Conn, sql);
                     int stay = Util.Function.IntTryParse(dt.Rows[0][0].ToString());
                     if (FullSet <= stay)

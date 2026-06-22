@@ -25,10 +25,16 @@ namespace KyungsinLPR
         //leess iNova2추가
         private iNova2.IPCamera m_camera1_inova2 = new iNova2.IPCamera();
         private iNova2.IPCamera m_camera2_inova2 = new iNova2.IPCamera();
+        // USB(DirectShow/UVC) 카메라 — 카메라별 CameraSource==USB 일 때 사용
+        private KyungsinLPR.USB.USBCamera m_camera1_usb = new KyungsinLPR.USB.USBCamera();
+        private KyungsinLPR.USB.USBCamera m_camera2_usb = new KyungsinLPR.USB.USBCamera();
         private Thread m_grabThread1;
         private Thread m_grabThread2;
         private bool m_keepGrab1;
         private bool m_keepGrab2;
+        // SDK OpenLiveView 실패 시 WPF MediaElement 폴백 프리뷰 (채널별)
+        private RtspPreview _rtspPreview1;
+        private RtspPreview _rtspPreview2;
         private FrameRate m_frameRate = new FrameRate();
         private double m_maxBufferSizeKB = 384;
         private string CamIP = string.Empty;
@@ -128,6 +134,8 @@ namespace KyungsinLPR
             clsThread.frm = frm;
             NgisWay.main = this;
             Main = this;
+            // ParkingWeb 이미지 서버 업로더 시작 (Setting.ini [UPLOAD] 섹션 사용)
+            clsImageUploader.Start();
         }
 
         #region GrapImage
@@ -136,7 +144,8 @@ namespace KyungsinLPR
             if(!m_keepGrab1) {
                 //leess iNova2추가
                 //m_grabThread1 = new Thread(GrabLoop1);
-                if(ENV.CameraEnv.iNovaType == 1) m_grabThread1 = new Thread(GrabLoop1);
+                if(IsUsbCam(1)) m_grabThread1 = new Thread(GrabLoop1_USB);
+                else if(ENV.CameraEnv.iNovaType == 1) m_grabThread1 = new Thread(GrabLoop1);
                 else if(ENV.CameraEnv.iNovaType == 2) m_grabThread1 = new Thread(GrabLoop1_iNova2);
                 m_grabThread1.IsBackground = true;
                 m_keepGrab1 = true;
@@ -148,7 +157,8 @@ namespace KyungsinLPR
             if(!m_keepGrab2) {
                 //leess iNova2추가
                 //m_grabThread2 = new Thread(GrabLoop2);
-                if(ENV.CameraEnv.iNovaType == 1) m_grabThread2 = new Thread(GrabLoop2);
+                if(IsUsbCam(2)) m_grabThread2 = new Thread(GrabLoop2_USB);
+                else if(ENV.CameraEnv.iNovaType == 1) m_grabThread2 = new Thread(GrabLoop2);
                 else if(ENV.CameraEnv.iNovaType == 2) m_grabThread2 = new Thread(GrabLoop2_iNova2);
                 m_grabThread2.IsBackground = true;
                 m_keepGrab2 = true;
@@ -198,7 +208,8 @@ namespace KyungsinLPR
                     if(err == IPCamError.OK) {
                         if(label1.Visible)
                             Util.Function.InvokeControlVisible(label1, false);
-                        SetBitmap(PicLpr1Image, bitmap);
+                        if(!(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic && ENV.CameraEnv.RecogMode == 1))
+                            SetBitmap(PicLpr1Image, bitmap);
                         if(Capture1) {
                             if(IpCam1Current.BracketInfo.Use)
                                 CurrentCnt = ENV.CameraEnv.IPCamera1Info.BarkectCnt;
@@ -275,6 +286,9 @@ namespace KyungsinLPR
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                         && ENV.CameraEnv.RecogMode == 0)
                                         CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
+                                    //Option(K) — 자체 CRNN/ONNX (64bit 전용)
+                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                                        OptionK.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                                 }
                                 if(RegList1.Count.Equals(0)) Cam1ID = 0;
@@ -292,11 +306,11 @@ namespace KyungsinLPR
                                 Capture1 = false;
                                 CapCnt = 0;
                                 Util.Logger.Log("AfterRegPlateCam Loop1");
-                                Thread thread = new Thread(delegate () {
-                                    clsThread.AfterRegPlateCam(0, ENV);
+                                // [수정] new Thread → ThreadPool — 트리거마다 OS 스레드 신규 생성 방지
+                                ThreadPool.QueueUserWorkItem(_ => {
+                                    try { clsThread.AfterRegPlateCam(0, ENV); }
+                                    catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                                 });
-                                thread.IsBackground = true;
-                                thread.Start();
                             }
                         }
                         try {
@@ -372,17 +386,23 @@ namespace KyungsinLPR
             int errCnt1 = 0;
             int CapCnt = 0;
             int CurrentCnt = 0;
+            bool firstFrameLogged = false;
             while(m_keepGrab1) {
                 try {
                     errCnt = 0;
                     errCnt1 = 0;
                     Bitmap bitmap;
                     iNova2.MetaInfo metaInfo;
-                    iNova2.IPCamError err = m_camera1_inova2.GetImage(1000, out bitmap, out metaInfo);                    
+                    iNova2.IPCamError err = m_camera1_inova2.GetImage(1000, out bitmap, out metaInfo);
+                    if(!firstFrameLogged) {
+                        Util.Logger.Log(string.Format("CAM1 GetImage 첫번째 결과={0}", err));
+                        firstFrameLogged = true;
+                    }
                     if(err == iNova2.IPCamError.OK) {
                         if(label1.Visible)
                             Util.Function.InvokeControlVisible(label1, false);
-                        SetBitmap(PicLpr1Image, bitmap);
+                        if(!(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic && ENV.CameraEnv.RecogMode == 1))
+                            SetBitmap(PicLpr1Image, bitmap);
                         if(Capture1) {
                             if(IpCam1Current.BracketInfo.Use)
                                 CurrentCnt = ENV.CameraEnv.IPCamera1Info.BarkectCnt;
@@ -442,6 +462,9 @@ namespace KyungsinLPR
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                         && ENV.CameraEnv.RecogMode == 0)
                                         CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
+                                    //Option(K) — 자체 CRNN/ONNX (64bit 전용)
+                                    if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                                        OptionK.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                                 }
                                 if(RegList1.Count.Equals(0)) Cam1ID = 0;
@@ -459,11 +482,11 @@ namespace KyungsinLPR
                                 Capture1 = false;
                                 CapCnt = 0;
                                 Util.Logger.Log("AfterRegPlateCam Loop1");
-                                Thread thread = new Thread(delegate () {
-                                    clsThread.AfterRegPlateCam(0, ENV);
+                                // [수정] new Thread → ThreadPool
+                                ThreadPool.QueueUserWorkItem(_ => {
+                                    try { clsThread.AfterRegPlateCam(0, ENV); }
+                                    catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                                 });
-                                thread.IsBackground = true;
-                                thread.Start();
                             }
                         }
                         try {
@@ -610,6 +633,11 @@ namespace KyungsinLPR
                                 CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                             }
+                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK) {
+#if WIN64
+                                OptionK.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
+#endif
+                            }
                             Path2 = fname;
                             if(RegList2.Count.Equals(0)) Cam2ID = 0;
                             CapCnt++;
@@ -639,11 +667,11 @@ namespace KyungsinLPR
 
                             CapCnt = 0;
                             Util.Logger.Log("AfterRegPlateCam Loop2");
-                            Thread thread = new Thread(delegate () {
-                                clsThread.AfterRegPlateCam(1, ENV);
+                            // [수정] new Thread → ThreadPool
+                            ThreadPool.QueueUserWorkItem(_ => {
+                                try { clsThread.AfterRegPlateCam(1, ENV); }
+                                catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                             });
-                            thread.IsBackground = true;
-                            thread.Start();
                         }
                     }
                     if(ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals("KJC1000")) {
@@ -783,6 +811,11 @@ namespace KyungsinLPR
                                 CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                             }
+                            else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK) {
+#if WIN64
+                                OptionK.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
+#endif
+                            }
                             Path2 = fname;
                             if(RegList2.Count.Equals(0)) Cam2ID = 0;
                             CapCnt++;
@@ -812,11 +845,11 @@ namespace KyungsinLPR
 
                             CapCnt = 0;
                             Util.Logger.Log("AfterRegPlateCam Loop2");
-                            Thread thread = new Thread(delegate () {
-                                clsThread.AfterRegPlateCam(1, ENV);
+                            // [수정] new Thread → ThreadPool
+                            ThreadPool.QueueUserWorkItem(_ => {
+                                try { clsThread.AfterRegPlateCam(1, ENV); }
+                                catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                             });
-                            thread.IsBackground = true;
-                            thread.Start();
                         }
                     }
                     if(ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals("KJC1000")) {
@@ -880,7 +913,7 @@ namespace KyungsinLPR
 
             if(Pic.InvokeRequired) {
                 var d = new SetBitmapCallback(SetBitmap);
-                if(!m_keepGrab1) return;
+                if(!m_keepGrab1 && !m_keepGrab2) return;
                 try {
                     this.BeginInvoke(d, new object[] { Pic, bitmap });
                 } catch(ObjectDisposedException) {
@@ -893,7 +926,53 @@ namespace KyungsinLPR
                 }
 
                 Pic.Image = bitmap;
+                if(_serverPanel != null) MirrorToServerCard(Pic, bitmap);
             }
+        }
+
+        /// <summary>서버모드: 기존 iNova 라이브 프레임을 서버 카드에 복제 표시(cam1→카드0, cam2→카드1).</summary>
+        private void MirrorToServerCard(PictureBox Pic, Bitmap bitmap) {
+            try {
+                if(_serverPanel == null || bitmap == null) return;
+                int idx = Pic == PicLpr1Image ? 0 : (Pic == PicLpr2Image ? 1 : -1);
+                if(idx < 0) return;
+                CameraCard card = _serverPanel.Card(idx);
+                if(card != null) card.SetImage((Image)bitmap.Clone());
+            } catch { }
+        }
+
+        /// <summary>서버모드: 인식 차번을 해당 카드에 표시(camIdx 0→카드1, 1→카드2).</summary>
+        public void UpdateServerCard(int camIdx, string plate) {
+            try {
+                if(_serverPanel == null) return;
+                CameraCard card = _serverPanel.Card(camIdx);
+                if(card == null) return;
+                bool ok = !string.IsNullOrEmpty(plate) && plate != "No_Detection";
+                card.SetPlate(plate, ok);
+            } catch { }
+        }
+
+        /// <summary>서버모드 카드 차량종류 태그 갱신 — 미인식=숨김, 정기=분홍, 일반=회색. (cam0/1·서버캠 공통)</summary>
+        public void UpdateServerCardType(int camIdx, string plate, bool reged) {
+            try {
+                if(_serverPanel == null) return;
+                CameraCard card = _serverPanel.Card(camIdx);
+                if(card == null) return;
+                if(string.IsNullOrEmpty(plate) || plate == "No_Detection") card.SetCarType(0);
+                else card.SetCarType(reged ? 2 : 1);
+            } catch { }
+        }
+
+        /// <summary>서버모드 카드용: 기존 카메라(cam1/cam2) 정보를 ServerCamConfig 슬롯에 채워 카드로 표시.</summary>
+        private void SetServerCardFromCam(int idx, ClsStructure.IPCamera_Basic_Setting cam, string defName, int gateType) {
+            try {
+                ServerCamConfig.CamSetting c = ServerCamConfig.Cams[idx];
+                c.Use = true;
+                c.Name = string.IsNullOrEmpty(cam.ChName) ? defName : cam.ChName;
+                c.Ip = cam.IP;
+                c.GateType = gateType;
+                ServerCamConfig.Cams[idx] = c;
+            } catch { }
         }
 
         bool m_warningShown = false;
@@ -932,6 +1011,259 @@ namespace KyungsinLPR
             GetCameraInfo();
         }
 
+        private ServerModePanel _serverPanel = null;
+        private ServerCamManager _serverCamMgr = null;   // 카드3~15 추가 카메라 그랩(A단계)
+        private readonly object _serverProcLock = new object();   // 서버캠 정산처리 직렬화(C단계)
+
+        /// <summary>서버모드([OPTIONK] remote=true)면 카드 그리드(5×3) 화면을 메인 위에 띄운다.
+        /// 인식은 ParkingWeb, 게이트/전광판/데이터처리는 LPR(추후 단계). 비서버모드면 아무것도 안 함.</summary>
+        private void InitServerModeUI() {
+            try {
+                string rm = Util.Function.IniReadValue("OPTIONK", "servermode") ?? "";
+                bool serverMode = rm.Equals("true", StringComparison.OrdinalIgnoreCase) || rm == "1";
+                if(!serverMode) return;
+                ServerCamConfig.Load();
+                // 서버모드 '사용 대수'만큼 카드 표시. 개별설정은 카드 더블클릭([SVRCAM{n}]).
+                int camCount = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
+                if(camCount < 1 || camCount > ServerCamConfig.MAX) camCount = 2;
+                for(int i = 0; i < ServerCamConfig.MAX; i++) {
+                    ServerCamConfig.CamSetting c = ServerCamConfig.Cams[i];
+                    c.Use = (i < camCount);
+                    if(string.IsNullOrEmpty(c.Name) || c.Name == "CAM" + (i + 1)) {
+                        if(i == 0 && !string.IsNullOrEmpty(ENV.CameraEnv.IPCamera1Info.ChName)) c.Name = ENV.CameraEnv.IPCamera1Info.ChName;
+                        else if(i == 1 && !string.IsNullOrEmpty(ENV.CameraEnv.IPCamera2Info.ChName)) c.Name = ENV.CameraEnv.IPCamera2Info.ChName;
+                        else c.Name = "카메라" + (i + 1);
+                    }
+                    ServerCamConfig.Cams[i] = c;
+                }
+                Util.Logger.Log(string.Format("[서버모드] 사용 대수 {0} → 카드 {0}개", camCount));
+                // 주의: 여기(frmCamMain_Load 앞부분)는 아직 ENV(func.GetEnv) 로드 전이라 주입 불가.
+                //  정산설정 주입은 ENV 로드 직후(frmCamMain_Load 의 clsServerCamEnv.Load)와 캡처 직전(ApplyCam)에 수행.
+                _serverPanel = new ServerModePanel();
+                _serverPanel.EnvClicked += delegate {
+                    btnEnv.PerformClick();                          // 기존 환경설정 다이얼로그
+                    this.BeginInvoke((Action)RebuildServerModeUI);  // 닫힌 뒤 화면 재구성(설정 반영)
+                };
+                // 카드의 캡처 버튼 → 기존 카메라 캡처 핸들러 직접 호출(가려진 버튼이라 PerformClick은 안 먹힘)
+                foreach(CameraCard card in _serverPanel.Cards) {
+                    int ci = card.Index;
+                    // 입출구 태그 = 카메라별 InOutType([SVRCAM] pc_CmbLPRInOut1). 출구=출차(적), 입구=입차(녹)
+                    string _io = Util.Function.IniReadValue("SVRCAM" + (ci + 1), "pc_CmbLPRInOut1") ?? "";
+                    card.SetGate(_io.Contains("출구"));
+                    card.SetCarType(0);   // 인식 전엔 차량종류 태그 숨김
+                    card.CaptureClicked += delegate {
+                        try {
+                            Util.Logger.Log(string.Format("[서버모드] 카드{0} 캡처 클릭", ci + 1));
+                            if(ci == 0) btnCam1Capture_Click(this, EventArgs.Empty);
+                            else if(ci == 1) btnCam2Capture_Click(this, EventArgs.Empty);
+                            else if(ci >= 2 && _serverCamMgr != null) _serverCamMgr.Capture(ci);   // 카드3~15(B단계)
+                        } catch(Exception ex) { Util.Logger.Log("[서버모드] 캡처 오류: " + ex.Message); }
+                    };
+                    // Alt+S TEST 모드: 카드 TEST 버튼(차번 수동입력 정산) / 우클릭(사진선택 인식)
+                    card.TestClicked += delegate {
+                        try { OnCardTest(ci, _serverPanel.Card(ci).TestPlate); }
+                        catch(Exception ex) { Util.Logger.Log("[서버모드] 카드 TEST 오류: " + ex.Message); }
+                    };
+                    card.TestPhotoClicked += delegate {
+                        try { OnCardTestPhoto(ci); }
+                        catch(Exception ex) { Util.Logger.Log("[서버모드] 카드 TEST 사진 오류: " + ex.Message); }
+                    };
+                    // 카드 더블클릭 → 환경설정을 '서버모드 반대' 필터로 열어 카메라 개별설정([SVRCAM{n}] 별도저장)
+                    card.CardDoubleClicked += delegate {
+                        try {
+                            Util.Logger.Log(string.Format("[서버모드] 카드{0} 더블클릭 — 카메라 개별설정", ci + 1));
+                            frmEnv frm = new frmEnv(ENV, m_camera1, m_camera2, m_camera1_inova2, m_camera2_inova2);
+                            frm.SerialDev = SerialDev;
+                            frm.StartPosition = FormStartPosition.CenterParent;
+                            // 서버캠(3~15) 라이브 디바이스 + 영역설정용 스냅샷 전달(고급설정/영역설정 동작용)
+                            try {
+                                string roiImg = null;
+                                CameraCard cc = _serverPanel.Card(ci);
+                                if(cc != null) {
+                                    Image snap = cc.GetSnapshot();
+                                    if(snap != null) {
+                                        roiImg = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "svrroi_" + (ci + 1) + ".jpg");
+                                        using(Bitmap b = new Bitmap(snap)) b.Save(roiImg, System.Drawing.Imaging.ImageFormat.Jpeg);
+                                        snap.Dispose();
+                                    }
+                                }
+                                frm.SetServerCamDevice(_serverCamMgr != null ? _serverCamMgr.GetDevice(ci) : null, roiImg);
+                            } catch(Exception ex2) { Util.Logger.Log("[서버모드] 디바이스/스냅샷 전달 오류: " + ex2.Message); }
+                            frm.SetServerCamMode(ci);   // 반대 필터 + 개별 저장 모드
+                            frm.ShowDialog();
+                            this.BeginInvoke((Action)RebuildServerModeUI);   // 닫힌 뒤 카드 이름 등 갱신
+                        } catch(Exception ex) { Util.Logger.Log("[서버모드] 개별설정 열기 오류: " + ex.Message); }
+                    };
+                }
+                this.Controls.Add(_serverPanel);
+                _serverPanel.BringToFront();
+                // 카드 3~15(인덱스 2~14) 추가 카메라 연결·영상(A단계). 카드 1,2는 기존 GrabLoop1/2가 미러링.
+                if(_serverCamMgr != null) { _serverCamMgr.Dispose(); _serverCamMgr = null; }
+                _serverCamMgr = new ServerCamManager();
+                _serverCamMgr.Start(camCount, delegate(int idx) { return _serverPanel.Card(idx); });
+                // 가로 5대 기준, 사용 대수에 맞춰 폼 크기 자동 조정.
+                // Load 뒷부분(this.Width=1000 등)이 덮어쓰므로 BeginInvoke 로 '그 이후'에 적용 + 화면크기 클램프.
+                try {
+                    int cols = Math.Min(camCount, ServerCamConfig.COLS);
+                    int rows = (camCount + ServerCamConfig.COLS - 1) / ServerCamConfig.COLS;
+                    int wantW = Math.Max(900, cols * 298 + 26);          // 카드 286 + 여백 12
+                    int wantH = Math.Max(520, 52 + rows * 266 + 26);     // 카드 248 + 여백 12 + 여유
+                    this.BeginInvoke((Action)delegate {
+                        try {
+                            this.WindowState = FormWindowState.Normal;
+                            System.Drawing.Rectangle wa = Screen.FromControl(this).WorkingArea;
+                            this.ClientSize = new System.Drawing.Size(Math.Min(wantW, wa.Width), Math.Min(wantH, wa.Height));
+                            this.CenterToScreen();
+                        } catch { }
+                    });
+                } catch { }
+                Util.Logger.Log(string.Format("[서버모드] 카드 화면 표시 — 사용 카메라 {0}개", ServerCamConfig.ActiveCount()));
+            } catch(Exception ex) {
+                Util.Logger.Log("[서버모드] UI 초기화 오류: " + ex.Message);
+            }
+        }
+
+        /// <summary>환경설정 닫힌 뒤 서버모드 화면 재구성(카메라 추가/서버모드 해제 반영).</summary>
+        private void RebuildServerModeUI() {
+            try {
+                if(_serverCamMgr != null) { _serverCamMgr.Dispose(); _serverCamMgr = null; }
+                if(_serverPanel != null) {
+                    this.Controls.Remove(_serverPanel);
+                    _serverPanel.Dispose();
+                    _serverPanel = null;
+                }
+                InitServerModeUI();   // 서버모드면 새로 생성, 해제됐으면 안 만들고 기존 화면 노출
+            } catch(Exception ex) {
+                Util.Logger.Log("[서버모드] 재구성 오류: " + ex.Message);
+            }
+        }
+
+        /// <summary>서버캠(인덱스 2~14) 캡처·인식 결과 → 정산처리(이미지저장 + DataProcess: 게이트개방/입출차기록/정기권/소켓) + 카드표시. C단계.
+        /// 카드 1,2(인덱스 0,1)는 기존 AfterRegPlateCam 경로 사용. 백그라운드 스레드에서 호출됨.</summary>
+        public void ProcessServerCamResult(int camIdx, string plate, System.Drawing.Image snapshot, DateTime captureTime) {
+            try {
+                if(string.IsNullOrEmpty(plate)) plate = "No_Detection";
+                clsServerCamEnv.ApplyCam(camIdx);   // ENV 재대입 대비 — 현재 ENV 에 이 카메라 게이트포트/장비 재주입
+                ClsStructure.Lpr_Info lpr = clsServerCamEnv.GetLpr(camIdx);
+                string chName = string.IsNullOrEmpty(lpr.ChNo) ? ("SVR" + (camIdx + 1)) : lpr.ChNo;
+                string datePath;
+                if(ENV.CameraEnv.SockDataFormat.Equals((int)ClsStructure.SockFormat.Nexpa))
+                    datePath = string.Format(@"{0}\{1}\{2}", captureTime.Year.ToString("D4"), captureTime.Month.ToString("D2"), captureTime.Day.ToString("D2"));
+                else
+                    datePath = captureTime.ToString("yyyyMMdd");
+                // 이미지 저장: {SavePath}\{datePath}\{ChName}_{plate}_{yyyyMMddHHmmss}.jpg (cam1/2와 동일 규칙)
+                string fileName = string.Format("{0}_{1}_{2}.jpg", chName, plate, captureTime.ToString("yyyyMMddHHmmss"));
+                if(snapshot != null) {
+                    try {
+                        string dir = string.Format(@"{0}\{1}", ENV.CameraEnv.ImageSave.SavePath, datePath);
+                        if(!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                        using(Bitmap b = new Bitmap(snapshot))
+                            b.Save(System.IO.Path.Combine(dir, fileName), System.Drawing.Imaging.ImageFormat.Jpeg);
+                        clsImageUploader.Enqueue(System.IO.Path.Combine(dir, fileName), datePath, fileName);   // ParkingWeb 업로드
+                    } catch(Exception se) { Util.Logger.Log("[서버캠] 이미지 저장 오류: " + se.Message); }
+                }
+
+                // 정산처리: 일반화된 DataProcess(게이트/입출차/정기권). 모든 카메라 공유락으로 직렬화(DB연결 동시사용 방지).
+                string log; bool reged;
+                lock(clsDataTransaction.ProcLock) {
+                    log = DataProcess.DataProcess(lpr.InOutType, ENV, camIdx, plate, fileName, captureTime.ToString("yyyy-MM-dd HH:mm:ss"), 0);
+                    reged = DataProcess.GetRegedCar(camIdx);   // 정기차량 여부(전광판 표시용)
+                }
+                Util.Logger.Log(string.Format("[서버캠{0}] 정산처리 차번={1} 장비={2}({3}) → {4}",
+                    camIdx + 1, plate, chName, lpr.InOutType == 1 ? "출구" : "입구", (log ?? "").Replace('\n', ' ')));
+                UpdateServerCard(camIdx, plate);
+                UpdateServerCardType(camIdx, plate, reged);   // 일반/정기 태그
+                ServerCamDisplay(camIdx, plate, reged);   // 카메라별 네트워크 전광판 출력(D단계)
+            } catch(Exception ex) { Util.Logger.Log("[서버캠] 정산처리 오류: " + ex.Message); }
+        }
+
+        // 서버캠(idx>=2) 네트워크 전광판 인스턴스 캐시
+        private static readonly System.Collections.Generic.Dictionary<int, NetworkDisplay> _svrNetDisp = new System.Collections.Generic.Dictionary<int, NetworkDisplay>();
+
+        /// <summary>서버캠(idx>=2)의 네트워크 전광판 인스턴스(없으면 생성·캐시·환영문구 루프 시작). Net 미설정이면 null.</summary>
+        public static NetworkDisplay NetDevForServer(int camIdx) {
+            try {
+                lock(_svrNetDisp) {
+                    NetworkDisplay nd;
+                    if(_svrNetDisp.TryGetValue(camIdx, out nd)) return nd;
+                    if(camIdx < 2 || ENV.CommunicationEnv.DisPlay == null || camIdx >= ENV.CommunicationEnv.DisPlay.Length) return null;
+                    ClsStructure.DisPlay_Info disp = ENV.CommunicationEnv.DisPlay[camIdx];
+                    if(!disp.Net.Use || string.IsNullOrEmpty(disp.Net.IP)) return null;
+                    nd = new NetworkDisplay();
+                    nd.Init(disp.Net.IP, disp.Net.Port, "TCP");
+                    nd.DisPlayTime = DateTime.Now.AddSeconds(-10);
+                    nd.Color1 = clsFunction.GetColor8Int(disp.Ment.Ment1Color);
+                    nd.Color2 = clsFunction.GetColor8Int(disp.Ment.Ment2Color);
+                    nd.Ment1 = disp.Ment.Ment1Line;
+                    nd.Ment2 = disp.Ment.Ment2Line;
+                    nd.Term = 5;
+                    nd.Entrance_Type = clsServerCamEnv.GetInOut(camIdx) == (int)ClsStructure.InoutType.입구용;
+                    nd.ReturnStart();   // 평소(차량 없을 때) 환영문구 표시 루프
+                    _svrNetDisp[camIdx] = nd;
+                    Util.Logger.Log(string.Format("[서버캠{0}] 네트워크 전광판 연결 {1}:{2}", camIdx + 1, disp.Net.IP, disp.Net.Port));
+                    return nd;
+                }
+            } catch(Exception ex) { Util.Logger.Log("[서버캠] 전광판 생성오류: " + ex.Message); return null; }
+        }
+
+        /// <summary>서버캠 인식결과를 네트워크 전광판에 출력(정기/일반). 미인식은 환영문구 유지(미송신).</summary>
+        private void ServerCamDisplay(int camIdx, string plate, bool reged) {
+            try {
+                if(camIdx < 2 || ENV.CommunicationEnv.DisPlay == null || camIdx >= ENV.CommunicationEnv.DisPlay.Length) return;
+                ClsStructure.DisPlay_Info disp = ENV.CommunicationEnv.DisPlay[camIdx];
+                if(!disp.Net.Use) return;
+                if(string.IsNullOrEmpty(plate) || plate == "No_Detection") return;   // 미인식 → 환영문구 유지
+                NetworkDisplay nd = NetDevForServer(camIdx);
+                if(nd == null) return;
+                string line1, color1, color2;
+                if(reged) { line1 = string.IsNullOrEmpty(disp.PeriodCar) ? "정기차량" : disp.PeriodCar; color1 = disp.Period1Color; color2 = disp.Period2Color; }
+                else      { line1 = string.IsNullOrEmpty(disp.NormalCar) ? "일반차량" : disp.NormalCar; color1 = disp.Normal1Color; color2 = disp.Normal2Color; }
+                nd.SendMsg(line1, clsFunction.GetColor8Int(color1), plate, clsFunction.GetColor8Int(color2));
+                nd.DisPlayTime = DateTime.Now;   // 차량 문구 Term 초 유지 후 환영문구 자동 복귀
+                Util.Logger.Log(string.Format("[서버캠{0}] 전광판 출력 '{1}' '{2}'", camIdx + 1, line1, plate));
+            } catch(Exception ex) { Util.Logger.Log("[서버캠] 전광판 출력오류: " + ex.Message); }
+        }
+
+        /// <summary>Alt+S 카드 TEST 버튼 — 차번 수동입력으로 정산(기존 TEST 와 동일). 카드0/1은 기존 핸들러 재사용.</summary>
+        private void OnCardTest(int ci, string plate) {
+            if(string.IsNullOrEmpty(plate)) { MessageBox.Show("차번을 입력하세요."); return; }
+            if(ci == 0 || ci == 1) {
+                txtTestCarNo.Text = plate;
+                if(ci == 0) btnTestCapture1_Click(this, EventArgs.Empty);
+                else btnTestCapture2_Click(this, EventArgs.Empty);
+                // 카드 표시 갱신(차번 + 일반/정기 태그) — 서버캠과 동일하게 카드에 보이도록
+                UpdateServerCard(ci, plate);
+                try { UpdateServerCardType(ci, plate, DataProcess.GetRegedCar(ci)); } catch { }
+            }
+            else {
+                Thread t = new Thread(delegate () {
+                    try { ProcessServerCamResult(ci, plate, null, DateTime.Now); }
+                    catch(Exception ex) { Util.Logger.Log("[서버캠] 수동TEST 오류: " + ex.Message); }
+                });
+                t.IsBackground = true; t.Start();
+            }
+        }
+
+        /// <summary>Alt+S 카드 TEST 우클릭 — 사진선택 후 인식하여 정산(기존 TEST 우클릭과 동일).</summary>
+        private void OnCardTestPhoto(int ci) {
+            if(ci == 0) { BtnTestCapture1_MouseUp(btnTestCapture1, new MouseEventArgs(MouseButtons.Right, 1, 0, 0, 0)); return; }
+            if(ci == 1) { BtnTestCapture2_MouseUp(btnTestCapture2, new MouseEventArgs(MouseButtons.Right, 1, 0, 0, 0)); return; }
+            // 서버캠(2~14): 사진선택 → ParkingWeb 인식 → 정산
+            OpenFileDialog dlg = new OpenFileDialog();
+            if(dlg.ShowDialog() != DialogResult.OK) return;
+            string file = dlg.FileName;
+            Thread t = new Thread(delegate () {
+                try {
+                    System.Collections.Generic.Dictionary<string, object> res = OptionK.RecognizeImage(file, "");
+                    string plate = (res != null && res.ContainsKey("plate")) ? Convert.ToString(res["plate"]) : "";
+                    if(string.IsNullOrEmpty(plate)) plate = "No_Detection";
+                    using(Image img = Image.FromFile(file))
+                        ProcessServerCamResult(ci, plate, img, DateTime.Now);
+                } catch(Exception ex) { Util.Logger.Log("[서버캠] 사진TEST 오류: " + ex.Message); }
+            });
+            t.IsBackground = true; t.Start();
+        }
+
         private void frmCamMain_Load(object sender, EventArgs e) {
             try {
                 //프로그램 버전 제목 표시줄 컴파일 일자 설정
@@ -939,6 +1271,7 @@ namespace KyungsinLPR
                 DateTime dt = new DateTime(2000, 1, 1);
                 this.Text += dt.AddDays(version.Build).ToString(" Ver:yyyyMMdd");
                 Util.Logger.Log("프로그램 기동");
+                InitServerModeUI();   // 서버모드면 카드 그리드 화면(5×3)으로 전환
                 //20161124 Start
                 if(!Directory.Exists(Directory.GetCurrentDirectory() + "\\Back")) {
                     Directory.CreateDirectory(Directory.GetCurrentDirectory() + "\\Back");
@@ -967,6 +1300,7 @@ namespace KyungsinLPR
                     Util.Logger.Log(string.Format("FielDelete Error {0}", FielDelete));
                 }
                 ENV = func.GetEnv(ENV);
+                clsServerCamEnv.Load();   // 서버모드 카메라 2~14 정산설정([SVRCAM] 장비/게이트) → ENV 주입(ENV 로드 직후)
 
                 BeforeCalOpt.Load();
                 clsOutService.Load();
@@ -983,7 +1317,11 @@ namespace KyungsinLPR
                 Util.Logger.Log("전광판 설정");
                 DataProcess = new clsDataTransaction(SerialDev, ENV);
                 ENV.RegCarControl = ENV.RegCarControl.Load();
-                if(ENV.StartType != (int)ClsStructure.ProgramStartType.CAM) {
+                // [동작모드] CAM 모드에서도 자료처리 수행 → 전광판 설정도 전 모드 공통 적용
+                // (전광판 미사용이면 내부 if(DisPlay.Use) 가드로 자동 skip)
+                {
+                    // 전광판1 설정 — 잘못된 IP/Port/장비타입이면 메시지박스 + 계속 진행
+                    try {
                     if(ENV.CommunicationEnv.DisPlay[0].Use) {
                         if(ENV.CommunicationEnv.DisPlay[0].Net.Use) {
                             if(ENV.CameraEnv.CoreCountry == CoreLogic.THA)
@@ -1042,7 +1380,23 @@ namespace KyungsinLPR
                             FirstDisPlayReturn.ReturnStart();
                         }
                     }
+                    } catch(Exception disp1Ex) {
+                        Util.Logger.Log("[전광판1 설정 오류] " + disp1Ex.ToString());
+                        MessageBox.Show(
+                            "전광판 1번 설정에 문제가 있습니다.\n\n"
+                            + "확인할 항목:\n"
+                            + "  - 네트워크 전광판: IP/Port가 올바른가? (빈 값/0 금지)\n"
+                            + "  - 시리얼 전광판: COM 포트가 존재하는가? Dev_Type_Name이 올바른가?\n"
+                            + "  - 멘트 색상 코드가 유효한가?\n\n"
+                            + "예외: " + disp1Ex.GetType().Name + "\n"
+                            + "메시지: " + disp1Ex.Message + "\n\n"
+                            + "(이 메시지는 전광판 1번에만 해당. 프로그램은 계속 실행됩니다.)",
+                            "전광판 1번 설정 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
 
+                    // 전광판2 설정 — 잘못된 IP/Port/장비타입이면 메시지박스 + 계속 진행
+                    try {
                     if(ENV.CommunicationEnv.DisPlay[1].Use) {
                         if(ENV.CommunicationEnv.DisPlay[1].Net.Use) {
                             if(ENV.CameraEnv.CoreCountry == CoreLogic.THA)
@@ -1099,6 +1453,20 @@ namespace KyungsinLPR
                             SecondDisPlayReturn.Term = 5;
                             SecondDisPlayReturn.ReturnStart();
                         }
+                    }
+                    } catch(Exception disp2Ex) {
+                        Util.Logger.Log("[전광판2 설정 오류] " + disp2Ex.ToString());
+                        MessageBox.Show(
+                            "전광판 2번 설정에 문제가 있습니다.\n\n"
+                            + "확인할 항목:\n"
+                            + "  - 네트워크 전광판: IP/Port가 올바른가? (빈 값/0 금지)\n"
+                            + "  - 시리얼 전광판: COM 포트가 존재하는가? Dev_Type_Name이 올바른가?\n"
+                            + "  - 멘트 색상 코드가 유효한가?\n\n"
+                            + "예외: " + disp2Ex.GetType().Name + "\n"
+                            + "메시지: " + disp2Ex.Message + "\n\n"
+                            + "(이 메시지는 전광판 2번에만 해당. 프로그램은 계속 실행됩니다.)",
+                            "전광판 2번 설정 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
                 if(ENV.RegCarControl.Regautodeluse) {
@@ -1186,11 +1554,45 @@ namespace KyungsinLPR
                                                 // 동영상 방식(FAVEngine)
                                                 Util.Logger.Log("FAVEngine 동영상 방식 시작");
                                                 thCoreInit = new Thread(delegate () {
-                                                    CoreLogic.Initialize();
-                                                    if(ENV.CameraEnv.IPCamera1Info.Use)
-                                                        CoreLogic.InitFAVE(0, ENV.CameraEnv.IPCamera1Info.RtspUrl);
-                                                    if(ENV.CameraEnv.IPCamera2Info.Use)
-                                                        CoreLogic.InitFAVE(1, ENV.CameraEnv.IPCamera2Info.RtspUrl);
+                                                    // 1단계: 전체 채널 Init → OpenLiveView 완료 후 FAVELoop 시작
+                                                    // (PopLPI 블로킹 중 Init 호출 시 SDK 충돌 방지)
+                                                    CoreLogic.InitializeForFAVE();
+                                                    bool cam1Ok = false, cam2Ok = false;
+                                                    if(ENV.CameraEnv.IPCamera1Info.Use) {
+                                                        cam1Ok = CoreLogic.InitFAVE(0, ENV.CameraEnv.IPCamera1Info.RtspUrl);
+                                                        Util.Logger.Log(string.Format("FAVEngine CAM1 Init 결과={0}", cam1Ok));
+                                                    }
+                                                    if(ENV.CameraEnv.IPCamera2Info.Use) {
+                                                        Thread.Sleep(2000);
+                                                        Util.Logger.Log(string.Format("FAVEngine CAM2 시작 RTSP={0}", ENV.CameraEnv.IPCamera2Info.RtspUrl));
+                                                        cam2Ok = CoreLogic.InitFAVE(1, ENV.CameraEnv.IPCamera2Info.RtspUrl);
+                                                        Util.Logger.Log(string.Format("FAVEngine CAM2 Init 결과={0}", cam2Ok));
+                                                    }
+                                                    // 2단계: 초기화 성공한 채널만 LiveView 시작
+                                                    // SDK OpenLiveView 실패 시 WPF MediaElement 폴백
+                                                    if(cam1Ok) {
+                                                        this.Invoke(new Action(() => {
+                                                            int rc = CoreLogic.StartLiveView(0, PicLpr1Image.IsHandleCreated ? PicLpr1Image.Handle : IntPtr.Zero);
+                                                            if(rc != 0) {
+                                                                _rtspPreview1 = new RtspPreview(PicLpr1Image, ENV.CameraEnv.IPCamera1Info.RtspUrl);
+                                                                Util.Logger.Log("FAVEngine CAM1 FFmpeg RTSP 폴백 프리뷰 시작");
+                                                            }
+                                                        }));
+                                                    }
+                                                    if(cam2Ok) {
+                                                        this.Invoke(new Action(() => {
+                                                            int rc = CoreLogic.StartLiveView(1, PicLpr2Image.IsHandleCreated ? PicLpr2Image.Handle : IntPtr.Zero);
+                                                            if(rc != 0) {
+                                                                _rtspPreview2 = new RtspPreview(PicLpr2Image, ENV.CameraEnv.IPCamera2Info.RtspUrl);
+                                                                Util.Logger.Log("FAVEngine CAM2 FFmpeg RTSP 폴백 프리뷰 시작");
+                                                            }
+                                                        }));
+                                                    }
+                                                    // 3단계: 모든 LiveView 완료 후 인식 루프 시작
+                                                    if(cam1Ok)
+                                                        CoreLogic.StartFAVELoop(0);
+                                                    if(cam2Ok)
+                                                        CoreLogic.StartFAVELoop(1);
                                                 });
                                             } else {
                                                 // 스트로브 방식(SSEngine) - 기존
@@ -1213,6 +1615,32 @@ namespace KyungsinLPR
                                 break;
 #endif
                         }
+#if WIN64
+                        // Option(K): LPR 시작 시 사이드카를 새로 띄움(기존 것 종료 후). 로딩+워밍업이 길어
+                        // CoreLogic 과 동일한 진행바(grpCoreInit)를 보여주고, 준비되면 자동으로 숨긴다.
+                        if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK) {
+                            // 로컬 파이썬 사이드카는 '카메라서버+자료처리(BOTH)' + 로컬 인식(원격 아님)일 때만 띄운다.
+                            //  - 원격 차번인식(ParkingWeb 위임): 사이드카 불필요 → 설정만 즉시 준비
+                            //  - 그 외 모드: 사이드카 미실행
+                            string _rm = Util.Function.IniReadValue("OPTIONK", "remote") ?? "";
+                            bool _remoteOcr = _rm.Equals("true", StringComparison.OrdinalIgnoreCase) || _rm == "1";
+                            bool _both = ENV.StartType == (int)ClsStructure.ProgramStartType.BOTH;   // 카메라서버+자료처리
+                            if(_remoteOcr) {
+                                Util.Logger.Log("OptionK 원격 인식 모드 — 로컬 사이드카 미실행(ParkingWeb 위임)");
+                                OptionK.Initialize(null);   // 원격 설정만 준비(프로세스 없이 즉시 완료)
+                            } else if(_both) {
+                                Util.Logger.Log("OptionK 사이드카 시작(백그라운드) — 카메라서버+자료처리 로컬 인식");
+                                thCoreInit = new Thread(delegate () { OptionK.Initialize(null); });
+                                thCoreInit.IsBackground = true;
+                                thCoreInit.Start();
+                                timer_Core.Enabled = true;
+                                grpCoreInit.Visible = true;
+                                grpCoreInit.Left = (510 - grpCoreInit.Width) / 2;
+                            } else {
+                                Util.Logger.Log("OptionK 로컬 사이드카 미실행 — 카메라서버+자료처리(BOTH) 모드 아님");
+                            }
+                        }
+#endif
                     }
                     Util.Logger.Log("카메라 스타트");
                     StartCamera();
@@ -1244,11 +1672,14 @@ namespace KyungsinLPR
                     lblCam2ChName.Text = "채널명: " + ENV.CameraEnv.IPCamera2Info.ChName;
                 }
                 //IO Board Connect
-                if(!ENV.CommonEnv.Dio.DioSetting.SerialPort.Equals(String.Empty)) {
+                bool isDingtianBoard = ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.DINGTIAN.ToString());
+                if(!ENV.CommonEnv.Dio.DioSetting.SerialPort.Equals(String.Empty) || isDingtianBoard) {
                     //Util.Logger.Log(ClsStructure.DeviceList.KJC1000.ToString());
                     if(ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
                         SerialDev.LoopOn += new clsSerialPort.eventInput(LoopDetect);
                     else if(ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.REALSYS.ToString()))
+                        SerialDev.LoopOn += new clsSerialPort.eventInput(LoopDetect);
+                    else if(isDingtianBoard)
                         SerialDev.LoopOn += new clsSerialPort.eventInput(LoopDetect);
                 }
                 //인증 버전 제거
@@ -1260,10 +1691,18 @@ namespace KyungsinLPR
                 #region CAM Exposure Setting Thread
                 //leess iNova2추가
                 tExposure = null;
-                if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
-                else if(ENV.CameraEnv.iNovaType == 2) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova2));
-                tExposure.IsBackground = true;
-                tExposure.Start();
+                // 카메라1·2 둘 다 USB이면 노출 제어 스레드 불필요 (USB는 자동노출)
+                bool needExposureThread = !(IsUsbCam(1) && IsUsbCam(2));
+                if(needExposureThread)
+                {
+                    if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
+                    else if(ENV.CameraEnv.iNovaType == 2) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova2));
+                    if(tExposure != null)
+                    {
+                        tExposure.IsBackground = true;
+                        tExposure.Start();
+                    }
+                }
                 #endregion
 
                 if(ENV.StartType.Equals((int)ClsStructure.ProgramStartType.BOTH)) {
@@ -1305,7 +1744,15 @@ namespace KyungsinLPR
                     }
                 }
             } catch(Exception LoadErr) {
-                Util.Logger.Log(Util.Logger.Log_Level.Event_Log, "Form_Load Error : " + LoadErr.Message);
+                Util.Logger.Log(Util.Logger.Log_Level.Event_Log, "Form_Load Error : " + LoadErr.ToString());
+                MessageBox.Show(
+                    "프로그램 초기화 중 오류가 발생했습니다.\n\n"
+                    + "예외 형식: " + LoadErr.GetType().Name + "\n"
+                    + "메시지: " + LoadErr.Message + "\n\n"
+                    + "스택 트레이스:\n" + (LoadErr.StackTrace ?? "(없음)") + "\n\n"
+                    + "log\\ 폴더의 로그 파일을 확인하세요.",
+                    "Form_Load 초기화 오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
             if(!GetMasterInfo.Use) {
@@ -1333,40 +1780,84 @@ namespace KyungsinLPR
 
         //leess iNova2추가
         private void StartCamera() {
+            // 카메라별 소스에 따라 분기 (혼합 시나리오: 카메라1·2 각각 IP 또는 USB)
+            bool bothUsbCams = ENV.CameraEnv.IPCamera1Info.Use && IsUsbCam(1)
+                            && ENV.CameraEnv.IPCamera2Info.Use && IsUsbCam(2);
+
+            if(ENV.CameraEnv.IPCamera1Info.Use)
+            {
+                if(IsUsbCam(1)) StartCamera_USB(1);
+                else if(GetCamSource(1) == 2 || ENV.CameraEnv.iNovaType == 2) { /* iNova2: StartCamera_iNova2 내부에서 처리 */ }
+                // 나머지는 아래 iNovaType 기반 일괄 처리 유지
+            }
+            if(ENV.CameraEnv.IPCamera2Info.Use)
+            {
+                if(IsUsbCam(2)) {
+                    // USB 카메라 2대 동시 시작 시 DirectShow isoch endpoint 경합 회피
+                    // 카메라1의 그래프가 안정 isoch 할당될 때까지 2.5초 대기 후 카메라2 시작
+                    if(bothUsbCams) {
+                        Util.Logger.Log("[USB] 카메라1 안정화 대기 (2500ms) 후 카메라2 시작");
+                        System.Threading.Thread.Sleep(2500);
+                    }
+                    StartCamera_USB(2);
+                }
+            }
+            // 기존 흐름: iNova IP 카메라가 1개라도 있으면 일괄 시작
+            // (USB만 사용 중인 카메라는 위에서 이미 시작됨 — StartCamera_iNova1/2 내부는 IP가 비어있으면 자동 스킵)
             if(ENV.CameraEnv.iNovaType == 1) StartCamera_iNova1();
             else if(ENV.CameraEnv.iNovaType == 2) StartCamera_iNova2();
         }
         private void StartCamera_iNova1() {
-            if(!ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
+            // USB로 설정된 채널은 iNova 시작 스킵 (StartCamera()에서 이미 USB 시작됨)
+            if(!IsUsbCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
                 if(m_camera1.ConnectStreamPort(ENV.CameraEnv.IPCamera1Info.IP, ENV.CameraEnv.IPCamera1Info.StreamUdp)) {
                     m_camera1.ConnectCommandPort(ENV.CameraEnv.IPCamera1Info.IP);
                     StartGrabLoop1();
                 }
-            if(!ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use)
-                if(m_camera2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp)) {
+            if(IsUsbCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
+            if(!IsUsbCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
+                bool streamOk = m_camera2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp);
+                Util.Logger.Log(string.Format("CAM2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera2Info.IP, streamOk));
+                if(streamOk) {
                     m_camera2.ConnectCommandPort(ENV.CameraEnv.IPCamera2Info.IP);
                     StartGrabLoop2();
+                    Util.Logger.Log("CAM2 GrabLoop2 시작");
                 }
+            }
+            if(IsUsbCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
         }
         private void StartCamera_iNova2() {
-            if(!ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
-                if(m_camera1_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera1Info.IP, ENV.CameraEnv.IPCamera1Info.StreamUdp) == iNova2.IPCamError.OK) {
+            if(!IsUsbCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use) {
+                iNova2.IPCamError cam1Err = m_camera1_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera1Info.IP, ENV.CameraEnv.IPCamera1Info.StreamUdp);
+                Util.Logger.Log(string.Format("CAM1 iNova2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera1Info.IP, cam1Err));
+                if(cam1Err == iNova2.IPCamError.OK) {
                     //leess 속도개선 : 샘플에서는 아래 호출하지 않음
                     //m_camera1_inova2.ConnectCommandPort(ENV.CameraEnv.IPCamera1Info.IP);
                     StartGrabLoop1();
+                    Util.Logger.Log("CAM1 GrabLoop1 iNova2 시작");
                 }
-            if(!ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use)
-                if(m_camera2_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp) == iNova2.IPCamError.OK) {
+            }
+            if(IsUsbCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
+            if(!IsUsbCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
+                iNova2.IPCamError streamErr = m_camera2_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp);
+                Util.Logger.Log(string.Format("CAM2 iNova2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera2Info.IP, streamErr));
+                if(streamErr == iNova2.IPCamError.OK) {
                     m_camera2_inova2.ConnectCommandPort(ENV.CameraEnv.IPCamera2Info.IP);
                     StartGrabLoop2();
+                    Util.Logger.Log("CAM2 GrabLoop2 iNova2 시작");
                 }
+            }
+            if(IsUsbCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
         }
 
         private void StopCamera() {
-            if(!ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
+            if(ENV.CameraEnv.IPCamera1Info.Use)
                 StopGrabLoop1();
-            if(!ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use)
+            if(ENV.CameraEnv.IPCamera2Info.Use)
                 StopGrabLoop2();
+            // USB 카메라 명시적 해제
+            try { if(IsUsbCam(1)) m_camera1_usb.DisconnectStreamPort(); } catch { }
+            try { if(IsUsbCam(2)) m_camera2_usb.DisconnectStreamPort(); } catch { }
         }
 
         private ClsStructure.IPCamera_Info GetCurrentInfo(IPCamera camera, string CamIp) {
@@ -2248,7 +2739,9 @@ namespace KyungsinLPR
         {
             Console.WriteLine(string.Format("{0} {1}", Port, Up));
             TimeSpan diff;
-            if (ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
+            // DINGTIAN(이더넷 릴레이)은 InEvent(port, on) 시그니처가 KJC-1000과 동일하므로 동일 분기 처리
+            bool isDingtian = ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.DINGTIAN.ToString());
+            if (ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name.Equals(ClsStructure.DeviceList.KJC1000.ToString()) || isDingtian)
             {
                 //env.CameraEnv.IPCamera1Info.DioInfo.LoopPort
                 if (Up)
@@ -3435,11 +3928,15 @@ namespace KyungsinLPR
         {
             try
             {
+                clsImageUploader.Stop();
                 m_keepGrab1 = false;
                 m_keepGrab2 = false;
 #if WIN64
-                if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic && ENV.CameraEnv.RecogMode == 1)
+                if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic && ENV.CameraEnv.RecogMode == 1) {
                     CoreLogic.ReleaseFAVE();
+                    _rtspPreview1?.Dispose(); _rtspPreview1 = null;
+                    _rtspPreview2?.Dispose(); _rtspPreview2 = null;
+                }
 #endif
                 if (ENV.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color8.ToString()))
                 {
@@ -3555,10 +4052,15 @@ namespace KyungsinLPR
                 }
                 if (ENV.CommunicationEnv.ClientTarget[1].Use)
                 {
-                    LprExitSvr.StartServer(ENV.CommunicationEnv.ClientTarget[1].Port);
-                    Thread t = new Thread(new ThreadStart(LprExitSvrProcessPackets));
-                    t.IsBackground = true;
-                    t.Start();
+                    try {
+                        LprExitSvr.StartServer(ENV.CommunicationEnv.ClientTarget[1].Port);
+                        Util.Logger.Log(string.Format("[소켓] 요금계산기(출차) 서버 리스닝 시작 포트 {0}", ENV.CommunicationEnv.ClientTarget[1].Port));
+                        Thread t = new Thread(new ThreadStart(LprExitSvrProcessPackets));
+                        t.IsBackground = true;
+                        t.Start();
+                    } catch (Exception sx) {
+                        Util.Logger.Log(string.Format("[소켓] 요금계산기 서버 시작 실패 포트 {0} — {1} (중복 실행/포트점유 확인! 무인정산기 접속 불가)", ENV.CommunicationEnv.ClientTarget[1].Port, sx.Message));
+                    }
                 }
                 if (ENV.CommunicationEnv.ClientTarget[2].Use)
                 {
@@ -3573,10 +4075,15 @@ namespace KyungsinLPR
                 }
                 if (ENV.CommunicationEnv.ClientTarget[4].Use)
                 {
-                    LprEntSvr.StartServer(ENV.CommunicationEnv.ClientTarget[4].Port);
-                    Thread t = new Thread(new ThreadStart(LprEntSvrProcessPackets));
-                    t.IsBackground = true;
-                    t.Start();
+                    try {
+                        LprEntSvr.StartServer(ENV.CommunicationEnv.ClientTarget[4].Port);
+                        Util.Logger.Log(string.Format("[소켓] 입차 서버 리스닝 시작 포트 {0}", ENV.CommunicationEnv.ClientTarget[4].Port));
+                        Thread t = new Thread(new ThreadStart(LprEntSvrProcessPackets));
+                        t.IsBackground = true;
+                        t.Start();
+                    } catch (Exception sx) {
+                        Util.Logger.Log(string.Format("[소켓] 입차 서버 시작 실패 포트 {0} — {1} (중복 실행/포트점유 확인!)", ENV.CommunicationEnv.ClientTarget[4].Port, sx.Message));
+                    }
                 }
                 if (socketUse)
                 {
@@ -4008,33 +4515,7 @@ namespace KyungsinLPR
 
             //}
 #endregion
-            //AMANOKOREA_HOMENET^102^00^00^020^000^105^63무6349^20161020080519^102^1002^김준기^
-            //데이터 종별   2
-            //주차장        3
-            //기계번호      3
-            //카드번호      n
-            //차량번호      n
-            //입차시각      14
-            //동             
-            //호
-            //고객명        n
-            //AMANOKOREA_HOMENET^102^00^00^020^000^105^63무6349^20161020080519^102^1002^김준기^
-            //HEADER : AMANOKOREA_HOMENET^
-            //LENGTH : 102^
-            //Fix : 00^
-            //InOut (00 : In 01 : Out) : 00^
-            //ParkNo : 020^
-            //ClientNo : 000^
-            //CardNo : 105^
-            //CarNo : 63무6349^
-            //EntranceDate : 20161020080519^
-            //Dong : 102^
-            //Ho : 1002^
-            //Name : 김준기^
-            //if (inoutCode == "01")
-            //    inoutCode = "00";
-            //else
-            //    inoutCode = "01";
+            
 
             string tmp = string.Format("00^{0}^{1:000}^{2:000}^{3}^{4}^{5}^{6}^{7}^{8}",
                 //inoutCode == "01" ? "00" : "01", ParkNo, ClientNo, CardNo, CarNo, inoutCode == "01" ? InDate : InDate + "^" + OutDate, Addr1, Addr2, OwnerName);
@@ -4354,17 +4835,17 @@ namespace KyungsinLPR
                             {
                                 case "GateOpen":
                                     Util.Logger.Log(string.Format("원격 차단기 열림 접점 {0} {1}", packet.Client.IP, sp[1]));
-                                    SerialDev.KJC1000.RelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
+                                    RemoteRelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateOpen^"));
                                     break;
                                 case "GateClose":
                                     Util.Logger.Log(string.Format("원격 차단기 닫힘 접점 {0} {1}", packet.Client.IP, sp[1]));
-                                    SerialDev.KJC1000.RelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
+                                    RemoteRelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateClose^"));
                                     break;
                                 case "OpenFix":
                                     Util.Logger.Log(string.Format("원격 차단기 열림고정 접점 {0} {1} {2}", packet.Client.IP, sp[1], sp[2]));
-                                    SerialDev.KJC1000.Relay(Util.Function.IntTryParse(sp[1]), sp[2]);
+                                    RemoteRelayFix(Util.Function.IntTryParse(sp[1]), sp[2]);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateClose^"));
                                     break;
                             }
@@ -4375,6 +4856,50 @@ namespace KyungsinLPR
 
                 System.Threading.Thread.Sleep(300);
             }
+        }
+
+        /// <summary>원격 GateOpen/Close — 보드 종류(DINGTIAN/KJC1000/REALSYS) 분기 — null 방어.</summary>
+        private void RemoteRelayOn(int port, int delay, int keep)
+        {
+            try
+            {
+                if (SerialDev == null) { Util.Logger.Log("[RemoteRelayOn] SerialDev null"); return; }
+                if (SerialDev.IsDingtian())
+                {
+                    if (SerialDev.Dingtian != null) SerialDev.Dingtian.RelayOn(port, delay, keep);
+                    return;
+                }
+                string devName = ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name;
+                if (devName.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
+                {
+                    if (SerialDev.KJC1000 != null) SerialDev.KJC1000.RelayOn(port, delay, keep);
+                }
+                else if (devName.Equals(ClsStructure.DeviceList.REALSYS.ToString()))
+                {
+                    if (SerialDev.RealSys != null) SerialDev.RealSys.RelayOn(port, delay, keep);
+                }
+            }
+            catch (Exception ex) { Util.Logger.Log("[RemoteRelayOn] " + ex.Message); }
+        }
+
+        /// <summary>원격 OpenFix — KJC1000은 Relay(port,value), 나머지 보드는 RelayOn으로 대체 처리.</summary>
+        private void RemoteRelayFix(int port, string value)
+        {
+            try
+            {
+                if (SerialDev == null) { Util.Logger.Log("[RemoteRelayFix] SerialDev null"); return; }
+                string devName = ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name;
+                if (devName.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
+                {
+                    if (SerialDev.KJC1000 != null) SerialDev.KJC1000.Relay(port, value);
+                }
+                else
+                {
+                    // DINGTIAN/REALSYS는 Relay(value) 미지원 — 일반 RelayOn 1초로 대체
+                    RemoteRelayOn(port, 0, 1000);
+                }
+            }
+            catch (Exception ex) { Util.Logger.Log("[RemoteRelayFix] " + ex.Message); }
         }
 
         private void LprEntSvrProcessPackets()
@@ -4578,17 +5103,17 @@ namespace KyungsinLPR
                             {
                                 case "GateOpen":
                                     Util.Logger.Log(string.Format("원격 차단기 열림 접점 {0} {1}", packet.Client.IP, sp[1]));
-                                    SerialDev.KJC1000.RelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
+                                    RemoteRelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateOpen^"));
                                     break;
                                 case "GateClose":
                                     Util.Logger.Log(string.Format("원격 차단기 닫힘 접점 {0} {1}", packet.Client.IP, sp[1]));
-                                    SerialDev.KJC1000.RelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
+                                    RemoteRelayOn(Util.Function.IntTryParse(sp[1]), 0, 1000);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateClose^"));
                                     break;
                                 case "OpenFix":
                                     Util.Logger.Log(string.Format("원격 차단기 열림고정 접점 {0} {1} {2}", packet.Client.IP, sp[1], sp[2]));
-                                    SerialDev.KJC1000.Relay(Util.Function.IntTryParse(sp[1]), sp[2]);
+                                    RemoteRelayFix(Util.Function.IntTryParse(sp[1]), sp[2]);
                                     PacketManager.SendPacket(packet.Client.TcpClient.GetStream(), Encoding.UTF8.GetBytes("GateClose^"));
                                     break;
                             }
@@ -4713,15 +5238,22 @@ namespace KyungsinLPR
                             }
                         }
                     }
-                    if (!tExposure.IsAlive)
+                    if (tExposure != null && !tExposure.IsAlive)
                     {
                         Util.Logger.Log(string.Format("Exposure 쓰레드 중단 재기동"));
                         //leess iNova2추가
                         tExposure = null;
-                        if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
-                        else if(ENV.CameraEnv.iNovaType == 2) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova2));
-                        tExposure.IsBackground = true;
-                        tExposure.Start();
+                        // 카메라1·2 둘 다 USB이면 재기동 불필요
+                        if(!(IsUsbCam(1) && IsUsbCam(2)))
+                        {
+                            if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
+                            else if(ENV.CameraEnv.iNovaType == 2) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova2));
+                            if(tExposure != null)
+                            {
+                                tExposure.IsBackground = true;
+                                tExposure.Start();
+                            }
+                        }
                     }
                 }
                 catch (Exception ImageSaveTermCheck_Error)
@@ -4995,12 +5527,21 @@ namespace KyungsinLPR
         {
             if (e.KeyCode == Keys.Alt || e.KeyCode == Keys.S)
             {
-                btnTestCapture1.Visible = true;
-                btnTestCapture2.Visible = true;
-                txtTestCarNo.Visible = true;
-                chkLoop1.Visible = true;
-                chkLoop2.Visible = true;
-                btnLoop.Visible = true;
+                bool serverMode = _serverPanel != null;
+                // 서버모드: 상단 TEST1/2·차번입력 불필요(카드마다 자체 TEST 있음). 일반모드만 표시.
+                if (!serverMode)
+                {
+                    btnTestCapture1.Visible = true;
+                    btnTestCapture2.Visible = true;
+                    txtTestCarNo.Visible = true;
+                    chkLoop1.Visible = true;
+                    chkLoop2.Visible = true;
+                    btnLoop.Visible = true;
+                    btnTestCapture1.BringToFront(); btnTestCapture2.BringToFront(); txtTestCarNo.BringToFront();
+                    chkLoop1.BringToFront(); chkLoop2.BringToFront(); btnLoop.BringToFront();
+                }
+                // 서버모드 카드: 각 카드 캡처버튼 자리에 [차번입력][TEST] 표시
+                if (serverMode) _serverPanel.SetTestMode(true);
 
                 Thread th = new Thread(new ThreadStart(timeCheck));
                 th.IsBackground = true;
@@ -5017,6 +5558,7 @@ namespace KyungsinLPR
             Util.Function.InvokeControlVisible(chkLoop1, false);
             Util.Function.InvokeControlVisible(chkLoop2, false);
             Util.Function.InvokeControlVisible(btnLoop, false);
+            try { if (_serverPanel != null) _serverPanel.SetTestMode(false); } catch { }   // 카드 캡처버튼 복귀
         }
 
         private void pictureBox1_DoubleClick(object sender, EventArgs e)
@@ -5098,15 +5640,17 @@ namespace KyungsinLPR
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
                             CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                        //Option(K)
+                        if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                            OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
 #endif
                     }
                     Util.Logger.Log("AfterRegPlateCam Loop1");
-                    Thread thread = new Thread(delegate ()
-                    {
-                        clsThread.AfterRegPlateCam(0, ENV);
+                    // [수정] new Thread → ThreadPool
+                    ThreadPool.QueueUserWorkItem(_ => {
+                        try { clsThread.AfterRegPlateCam(0, ENV); }
+                        catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                     });
-                    thread.IsBackground = true;
-                    thread.Start();
                 }
             }
             else if (e.Button == MouseButtons.Middle)
@@ -5165,6 +5709,9 @@ namespace KyungsinLPR
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
                             CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                        //Option(K)
+                        if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                            OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
 #endif
                     }
                     //NgisWay.Reg1(RegArray1[CapCnt]);
@@ -5185,15 +5732,17 @@ namespace KyungsinLPR
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
                             CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                        //Option(K)
+                        if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                            OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
 #endif
                     }
                     Util.Logger.Log("AfterRegPlateCam Loop1");
-                    Thread thread = new Thread(delegate ()
-                    {
-                        clsThread.AfterRegPlateCam(0, ENV);
+                    // [수정] new Thread → ThreadPool
+                    ThreadPool.QueueUserWorkItem(_ => {
+                        try { clsThread.AfterRegPlateCam(0, ENV); }
+                        catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                     });
-                    thread.IsBackground = true;
-                    thread.Start();
                 }
             }
         }
@@ -5241,15 +5790,17 @@ namespace KyungsinLPR
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
                             CoreLogic.Reg(1, 0, ENV.CameraEnv.bRegCarType);
+                        //Option(K)
+                        if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
+                            OptionK.Reg(1, 0, ENV.CameraEnv.bRegCarType);
 #endif
                     }
                     Util.Logger.Log("AfterRegPlateCam Loop2");
-                    Thread thread = new Thread(delegate ()
-                    {
-                        clsThread.AfterRegPlateCam(1, ENV);
+                    // [수정] new Thread → ThreadPool
+                    ThreadPool.QueueUserWorkItem(_ => {
+                        try { clsThread.AfterRegPlateCam(1, ENV); }
+                        catch (Exception ex) { Util.Logger.Log("AfterRegPlateCam 예외: " + ex.Message); }
                     });
-                    thread.IsBackground = true;
-                    thread.Start();
                 }
             }
         }

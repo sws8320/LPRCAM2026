@@ -92,6 +92,22 @@ namespace KyungsinLPR
             public int TriggerMode;
             public bool SendStxEtx;
             public string RtspUrl; // FAVEngine 동영상 방식용 RTSP URL
+            // 카메라별 소스 — 0 = iNova(전역 iNovaType 사용), 1 = iNova1, 2 = iNova2, 3 = USB(DirectShow)
+            // 혼합 시나리오: 카메라1과 카메라2 각각 다른 소스 선택 가능
+            public int CameraSource;
+            public string UsbMoniker; // DirectShow MonikerString (예: @device:pnp:\\?\usb#vid_xxxx...)
+            public string UsbDeviceName; // 표시용 이름 (예: "OBSBOT Tiny 4K")
+            public int UsbResolutionWidth;
+            public int UsbResolutionHeight;
+        }
+
+        // 카메라 소스 종류 — IPCamera_Basic_Setting.CameraSource 값
+        public enum CameraSourceType
+        {
+            Default = 0,   // 전역 iNovaType 적용 (하위호환)
+            iNova1 = 1,
+            iNova2 = 2,
+            USB = 3
         }
 
         public struct IPCamera_Info
@@ -230,7 +246,7 @@ namespace KyungsinLPR
             public int Target3;
         }
 
-        public enum DeviceList { KJC1000, REALSYS};
+        public enum DeviceList { KJC1000, REALSYS, DINGTIAN };
         public enum DeviceType { 이벤트, 리얼 };
         public enum ImageProceType { 이미지자르기, 번호판확인 };
         public enum Bracket { 모드1, 모드2, 모드3 };
@@ -248,7 +264,7 @@ namespace KyungsinLPR
 
         public enum RegModule
         {
-            Elwox, Ngis, CoreLogic
+            Elwox, Ngis, CoreLogic, OptionK   // OptionK=3 (자체 CRNN/ONNX). 기존 값 보존 위해 끝에 추가.
         };
 
         public enum CoreType
@@ -342,6 +358,8 @@ namespace KyungsinLPR
             public string Setting;
             public string Dev_Type_Name;
             public bool Type;
+            public string IpAddress;   // DINGTIAN 등 이더넷 릴레이 보드 IP
+            public int NetPort;        // DINGTIAN TCP/UDP 포트 (기본 60001)
         }
 
         public struct Dio_OutPut

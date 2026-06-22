@@ -301,23 +301,38 @@ namespace KyungsinLPR.iNova2 {
         /// <returns></returns>
         public IPCamError DisconnectStreamPort()
         {
+            // [수정] Close()만 호출하면 SafeHandle/네트워크 스트림 해제가 GC 시점까지 지연 → 재연결 반복 시 핸들 누수.
+            // try-finally로 예외에 안전하게 Dispose까지 호출.
             if (m_isUDPStreaming)
             {
                 if (m_sock_SRM_UDP == null) return IPCamError.StreamNotOpened;
 
-                var data = Encoding.ASCII.GetBytes("DISCONNECT");
-                m_sock_SRM_UDP.Send(data, data.Length);
-                m_sock_SRM_UDP.Close();
-                m_sock_SRM_UDP = null;
+                try
+                {
+                    var data = Encoding.ASCII.GetBytes("DISCONNECT");
+                    try { m_sock_SRM_UDP.Send(data, data.Length); } catch { }
+                }
+                finally
+                {
+                    try { m_sock_SRM_UDP.Close(); } catch { }
+                    try { ((IDisposable)m_sock_SRM_UDP).Dispose(); } catch { }
+                    m_sock_SRM_UDP = null;
+                }
             }
             else
             {
                 if (m_stream_SRM == null) return IPCamError.StreamNotOpened;
 
-                m_stream_SRM.Close();
+                try { m_stream_SRM.Close(); } catch { }
+                try { m_stream_SRM.Dispose(); } catch { }
                 m_stream_SRM = null;
-                m_sock_SRM_TCP.Close();
-                m_sock_SRM_TCP = null;
+
+                if (m_sock_SRM_TCP != null)
+                {
+                    try { m_sock_SRM_TCP.Close(); } catch { }
+                    try { ((IDisposable)m_sock_SRM_TCP).Dispose(); } catch { }
+                    m_sock_SRM_TCP = null;
+                }
             }
             return IPCamError.OK;
         }
@@ -368,12 +383,19 @@ namespace KyungsinLPR.iNova2 {
         /// <returns></returns>
         public IPCamError DisconnectCommandPort()
         {
+            // [수정] Close + Dispose로 핸들 즉시 해제 (예외 발생 시에도 누수 방지)
             if (m_stream_CMD == null) return IPCamError.StreamNotOpened;
 
-            m_stream_CMD.Close();
+            try { m_stream_CMD.Close(); } catch { }
+            try { m_stream_CMD.Dispose(); } catch { }
             m_stream_CMD = null;
-            m_sock_CMD.Close();
-            m_sock_CMD = null;
+
+            if (m_sock_CMD != null)
+            {
+                try { m_sock_CMD.Close(); } catch { }
+                try { ((IDisposable)m_sock_CMD).Dispose(); } catch { }
+                m_sock_CMD = null;
+            }
             return IPCamError.OK;
         }
 

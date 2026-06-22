@@ -203,6 +203,7 @@ namespace KyungsinLPR
                         main.SetLabelText(main.lblCam2RegSpeed, String.Format("인식속도: {0}ms", ProcessReg.term));
                         main.SetLabelText(main.lblCam2RegResult, "인식결과: " + ProcessReg.PlateNo);
                     }
+                    main.UpdateServerCard(Camidx, ProcessReg.PlateNo);   // 서버모드 카드에 차번 표시
                 }
                 catch (Exception DisPlayError)
                 {
@@ -238,6 +239,9 @@ namespace KyungsinLPR
                                     string.Format("{0} 기타 이미지 저장 Source {1} Target {2} file size : {3}", LogCamIDX, SourcePath, TargetPath, item.Size));
                                 clsFunction.SaveImage(SourcePath, TargetPath,
                                         item.Roi, item.Exposure.ToString(), item.PlateNo);
+                                // ParkingWeb 이미지 서버 업로드 (fire-and-forget) — 기타 이미지
+                                clsImageUploader.Enqueue(TargetPath, DatePath,
+                                    string.Format("{0}_{1}_{2}", CamInfo.ChName, item.PlateNo, item.SourcePath.Substring(CamInfo.ChName.Length)));
                                 //20161124 End
                                 //Util.Logger.Log(Util.Logger.Log_Level.Event_Log,
                                 //    string.Format("{0} 기타 이미지 저장 Source {1} Target {2}\\{3}\\{4}_{5}_{6} file size : {7}", LogCamIDX, item.SourcePath, CamEnv.CameraEnv.ImageSave.EtcPath,
@@ -310,6 +314,12 @@ namespace KyungsinLPR
                 clsFunction.SaveImage(Fname,
                                 string.Format("{0}\\{1}\\{2}_{3}_{4}.jpg", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, CamInfo.ChName, ProcessReg.PlateNo, Path.GetFileName(Fname).Substring(CamInfo.ChName.Length, 14)),
                                 ProcessReg.PlateRoi, ProcessReg.Exposure.ToString(), ProcessReg.PlateNo);
+                // ParkingWeb 이미지 서버 업로드 (fire-and-forget) — BigSize 분기
+                {
+                    string _upName = string.Format("{0}_{1}_{2}.jpg", CamInfo.ChName, ProcessReg.PlateNo, Path.GetFileName(Fname).Substring(CamInfo.ChName.Length, 14));
+                    string _upFull = string.Format("{0}\\{1}\\{2}", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, _upName);
+                    clsImageUploader.Enqueue(_upFull, DatePath, _upName);
+                }
                 string cartype = "";
                 string rate = "";
                 int irate = 0;
@@ -349,17 +359,29 @@ namespace KyungsinLPR
                 clsFunction.SaveImage(ProcessReg.SourcePath,
                                 string.Format("{0}\\{1}\\{2}_{3}_{4}.jpg", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14)),
                                 ProcessReg.PlateRoi, ProcessReg.Exposure.ToString(), ProcessReg.PlateNo);
+                // ParkingWeb 이미지 서버 업로드 (fire-and-forget) — 기본 분기
+                {
+                    string _upName = string.Format("{0}_{1}_{2}.jpg", CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14));
+                    string _upFull = string.Format("{0}\\{1}\\{2}", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, _upName);
+                    clsImageUploader.Enqueue(_upFull, DatePath, _upName);
+                }
 #endif
                 if (Camidx == 0)
                     main.Path1 = string.Format("{0}\\{1}\\{2}_{3}_{4}.jpg", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14));
                 else
                     main.Path2 = string.Format("{0}\\{1}\\{2}_{3}_{4}.jpg", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14));
                 //Console.WriteLine("Socket Send");
-                if (frmLprMain.ENV.StartType != (int)ClsStructure.ProgramStartType.CAM)
+                // [동작모드] CAM(카메라서버) 모드에서도 자료처리 수행 — 전 모드 공통 DataProcess
+                // (DataProcess 내부에서 설정(LprOpt.Normal/Period_SendData)에 따라 요금계산기 소켓 전송도 수행)
                 {
-                    string Log = main.DataProcess.DataProcess(LprInfo.InOutType, CamEnv, Camidx, ProcessReg.PlateNo.ToString(),
-                        string.Format("{0}_{1}_{2}.jpg", CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14)),
-                        ProcessReg.FirstCaptureTime, irate);
+                    // 공유락으로 직렬화 — 서버캠(ProcessServerCamResult)과 동일 락. 단일 DB연결(TCon) 동시사용 방지.
+                    string Log;
+                    lock(clsDataTransaction.ProcLock) {
+                        Log = main.DataProcess.DataProcess(LprInfo.InOutType, CamEnv, Camidx, ProcessReg.PlateNo.ToString(),
+                            string.Format("{0}_{1}_{2}.jpg", CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14)),
+                            ProcessReg.FirstCaptureTime, irate);
+                        try { main.UpdateServerCardType(Camidx, ProcessReg.PlateNo, main.DataProcess.GetRegedCar(Camidx)); } catch { }   // 카드 일반/정기 태그
+                    }
                     Util.Logger.Log(string.Format("{0} Log Msg : {1}", LogCamIDX, Log));
 
                     Thread.Sleep(1000);
@@ -379,39 +401,25 @@ namespace KyungsinLPR
                                 string fname = string.Format("{0}\\{1}\\{2}_{3}_{4}.jpg", CamEnv.CameraEnv.ImageSave.SavePath, DatePath, CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(0, 14));
                                 if (File.Exists(fname))
                                 {
+                                    // [수정] 이전 BackgroundImage Dispose + Image.FromFile 파일 락 회피
+                                    // (기존: 매 차량 인식마다 Image/GDI 핸들 + 파일 핸들 누적 누수 → 장시간 운영 시 카메라 끊김/PC 저하)
                                     if (Camidx == 0)
-                                        frm.pictureBox1.BackgroundImage = Image.FromFile(fname);
+                                    {
+                                        Image oldBg = frm.pictureBox1.BackgroundImage;
+                                        frm.pictureBox1.BackgroundImage = clsFunction.LoadImageNoLock(fname);
+                                        if (oldBg != null) oldBg.Dispose();
+                                    }
                                     else
-                                        frm.pictureBox2.BackgroundImage = Image.FromFile(fname);
+                                    {
+                                        Image oldBg = frm.pictureBox2.BackgroundImage;
+                                        frm.pictureBox2.BackgroundImage = clsFunction.LoadImageNoLock(fname);
+                                        if (oldBg != null) oldBg.Dispose();
+                                    }
                                 }
                             }
                         }
                     }
                     frmLprMain.Main.FullCheck();
-                }
-                else if (frmLprMain.ENV.StartType == (int)ClsStructure.ProgramStartType.CAM)
-                {
-                    DateTime ptime;
-                    DateTime.TryParse(ProcessReg.FirstCaptureTime, out ptime);
-                    string SendCal_Msg = clsFunction.MakeTransMessage(CamEnv.CameraEnv.SockDataFormat, Camidx.Equals(0) ? CamEnv.CameraEnv.IPCamera1Info.ChName : CamEnv.CameraEnv.IPCamera2Info.ChName,
-                        ProcessReg.PlateNo, CamEnv.CameraEnv.ImageSave.SavePath,
-                        string.Format("{0}_{1}_{2}.jpg", CamInfo.ChName, ProcessReg.PlateNo, ProcessReg.SourcePath.Substring(CamInfo.ChName.Length, 14)), ptime);
-                    Util.Logger.Log(string.Format("요금계산기 정보 전송 {0}", SendCal_Msg));
-                    bool stxetx = Camidx == 0 ? CamEnv.CameraEnv.IPCamera1Info.SendStxEtx : CamEnv.CameraEnv.IPCamera2Info.SendStxEtx;
-                    if (LprInfo.InOutType == 0)
-                    {
-                        if (stxetx)
-                            frmLprMain.Main.LprEntSvr.SendMsgSTXETX(SendCal_Msg);
-                        else
-                            frmLprMain.Main.LprEntSvr.SendMsg(SendCal_Msg);
-                    }
-                    else
-                    {
-                        if (stxetx)
-                            frmLprMain.Main.LprExitSvr.SendMsgSTXETX(SendCal_Msg);
-                        else
-                            frmLprMain.Main.LprExitSvr.SendMsg(SendCal_Msg);
-                    }
                 }
                 Util.Logger.Log(string.Format("{0} File Delete", LogCamIDX));
                 DirectoryInfo di = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -465,26 +473,24 @@ namespace KyungsinLPR
         }
 
         //NgisWay Module
+        // [수정] new Thread → ThreadPool — 트리거마다 OS 스레드 생성/스택 1MB 할당하던 부담 제거
+        // (장시간 운영 시 스레드 폭증 → 컨텍스트 스위칭으로 PC 저하)
         public static void RegPlateNoNgisWay(int camindex, ClsStructure.RegStruct dr)
         {
-            Thread t = new Thread(delegate()
+            ThreadPool.QueueUserWorkItem(delegate(object _)
             {
-                //RegPlate(Listidx, CamIdx, FilePath, ROI);
-                main.NgisWay.RegPlate(1, dr);
+                try { main.NgisWay.RegPlate(1, dr); }
+                catch (Exception ex) { Util.Logger.Log("RegPlateNoNgisWay 예외: " + ex.Message); }
             });
-            t.IsBackground = true;
-            t.Start();
         }
 
         public static void RegPlateNoNgisWay(int camindex, int idx)
         {
-            Thread t = new Thread(delegate()
+            ThreadPool.QueueUserWorkItem(delegate(object _)
             {
-                //RegPlate(Listidx, CamIdx, FilePath, ROI);
-                main.NgisWay.RegPlate(camindex, idx);
+                try { main.NgisWay.RegPlate(camindex, idx); }
+                catch (Exception ex) { Util.Logger.Log("RegPlateNoNgisWay 예외: " + ex.Message); }
             });
-            t.IsBackground = true;
-            t.Start();
         }
 
         private static void frmLogging(string msg)
@@ -500,13 +506,12 @@ namespace KyungsinLPR
 
         public static void RegPlateNoElwox(int camindex, int idx)
         {
-            Thread t = new Thread(delegate()
+            // [수정] new Thread → ThreadPool (동일 사유)
+            ThreadPool.QueueUserWorkItem(delegate(object _)
             {
-                //RegPlate(Listidx, CamIdx, FilePath, ROI);
-                regPlate(camindex, idx);
+                try { regPlate(camindex, idx); }
+                catch (Exception ex) { Util.Logger.Log("RegPlateNoElwox 예외: " + ex.Message); }
             });
-            t.IsBackground = true;
-            t.Start();
         }
 
         private static void regPlate(int Camindex, int idx)

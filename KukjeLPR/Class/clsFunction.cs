@@ -73,6 +73,12 @@ namespace KyungsinLPR
             EnvInfo.CameraEnv.IPCamera1Info.RtspUrl = ReadIni("CAMERA", "cam1rtspurl");
             EnvInfo.CameraEnv.IPCamera1Info.ChName = ReadIni("CAMERA", "cam1chname");
             EnvInfo.CameraEnv.IPCamera1Info.StreamUdp = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam1udp"));
+            // USB 카메라 — 0=Default(iNova), 1=iNova1, 2=iNova2, 3=USB
+            EnvInfo.CameraEnv.IPCamera1Info.CameraSource = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1source"));
+            EnvInfo.CameraEnv.IPCamera1Info.UsbMoniker = ReadIni("CAMERA", "cam1usbmoniker");
+            EnvInfo.CameraEnv.IPCamera1Info.UsbDeviceName = ReadIni("CAMERA", "cam1usbname");
+            EnvInfo.CameraEnv.IPCamera1Info.UsbResolutionWidth = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1usbwidth"));
+            EnvInfo.CameraEnv.IPCamera1Info.UsbResolutionHeight = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1usbheight"));
             //EnvInfo.CameraEnv.IPCamera1Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM1", "etcsave"));
             //EnvInfo.CameraEnv.IPCamera1Info.ImageSave.EtcPath = ReadIni("IPCAM1", "etcpath");
             EnvInfo.CameraEnv.IPCamera1Info.User_Setting_Resend_Interval = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1interval"));
@@ -143,6 +149,11 @@ namespace KyungsinLPR
             EnvInfo.CameraEnv.IPCamera2Info.RtspUrl = ReadIni("CAMERA", "cam2rtspurl");
             EnvInfo.CameraEnv.IPCamera2Info.ChName = ReadIni("CAMERA", "cam2chname");
             EnvInfo.CameraEnv.IPCamera2Info.StreamUdp = Util.Function.BoolTryParse(ReadIni("CAMERA", "cam2udp"));
+            EnvInfo.CameraEnv.IPCamera2Info.CameraSource = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2source"));
+            EnvInfo.CameraEnv.IPCamera2Info.UsbMoniker = ReadIni("CAMERA", "cam2usbmoniker");
+            EnvInfo.CameraEnv.IPCamera2Info.UsbDeviceName = ReadIni("CAMERA", "cam2usbname");
+            EnvInfo.CameraEnv.IPCamera2Info.UsbResolutionWidth = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2usbwidth"));
+            EnvInfo.CameraEnv.IPCamera2Info.UsbResolutionHeight = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2usbheight"));
             //EnvInfo.CameraEnv.IPCamera2Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM2", "etcsave"));
             //EnvInfo.CameraEnv.IPCamera2Info.ImageSave.EtcPath = ReadIni("IPCAM2", "etcpath");
             EnvInfo.CameraEnv.IPCamera2Info.User_Setting_Resend_Interval = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2interval"));
@@ -304,7 +315,7 @@ namespace KyungsinLPR
             EnvInfo.CommonEnv.Dio.DioSetting.Dev_Type_Name = ReadIni("COMMON", "diotypename");
             EnvInfo.CommonEnv.Dio.DioSetting.Type = Util.Function.BoolTryParse(ReadIni("COMMON", "boardtype"));
 
-            EnvInfo.CommonEnv.Dio.DioOutPut = new ClsStructure.Dio_OutPut[2];
+            EnvInfo.CommonEnv.Dio.DioOutPut = new ClsStructure.Dio_OutPut[15];   // 서버모드 N대(0/1=기존, 2~14=서버캠 게이트)
             EnvInfo.CommonEnv.Dio.DioOutPut[0].Use = Util.Function.BoolTryParse(ReadIni("COMMON", "gate1use"));
             EnvInfo.CommonEnv.Dio.DioOutPut[0].Port = Util.Function.IntTryParse(ReadIni("COMMON", "gate1port"));
             EnvInfo.CommonEnv.Dio.DioOutPut[0].Delay = Util.Function.IntTryParse(ReadIni("COMMON", "gate1delay"));
@@ -324,6 +335,11 @@ namespace KyungsinLPR
             EnvInfo.CommonEnv.Dio.DioOutPut[1].AddDelay = Util.Function.IntTryParse(ReadIni("COMMON", "gate2adddelay"));
             EnvInfo.CommonEnv.Dio.DioOutPut[1].AddKeep = Util.Function.IntTryParse(ReadIni("COMMON", "gate2addkeep"));
 
+            // DINGTIAN 이더넷 릴레이 보드 (IP/포트). 시리얼 모델은 비어있음
+            EnvInfo.CommonEnv.Dio.DioSetting.IpAddress = ReadIni("COMMON", "dioip");
+            EnvInfo.CommonEnv.Dio.DioSetting.NetPort = Util.Function.IntTryParse(ReadIni("COMMON", "dionetport"));
+            if (EnvInfo.CommonEnv.Dio.DioSetting.NetPort <= 0) EnvInfo.CommonEnv.Dio.DioSetting.NetPort = 60001;
+
             EnvInfo.CommonEnv.Dio.IsolatePort = new ClsStructure.Add_Dio_InOut();
             EnvInfo.CommonEnv.Dio.IsolatePort.Out.Use = Util.Function.BoolTryParse(ReadIni("COMMON", "isolateuse"));
             EnvInfo.CommonEnv.Dio.IsolatePort.In.LoopPort = Util.Function.IntTryParse(ReadIni("COMMON", "isolateinput"));
@@ -336,7 +352,7 @@ namespace KyungsinLPR
             #endregion
 
             #region 전광판
-            EnvInfo.CommunicationEnv.DisPlay = new ClsStructure.DisPlay_Info[2];
+            EnvInfo.CommunicationEnv.DisPlay = new ClsStructure.DisPlay_Info[15];   // 서버모드 N대(0/1=기존, 2~14=서버캠 전광판)
             EnvInfo.CommunicationEnv.DisPlay[0].Use = Util.Function.BoolTryParse(ReadIni("COMMUNICATION", "display1Use"));
             EnvInfo.CommunicationEnv.DisPlay[0].Com.SerialPort = ReadIni("COMMUNICATION", "display1port");
             EnvInfo.CommunicationEnv.DisPlay[0].Com.Setting = ReadIni("COMMUNICATION", "display1setting");
@@ -516,6 +532,11 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "cam1rtspurl", env.CameraEnv.IPCamera1Info.RtspUrl ?? "");
             WriteIni("CAMERA", "cam1chname", env.CameraEnv.IPCamera1Info.ChName);
             WriteIni("CAMERA", "cam1udp", env.CameraEnv.IPCamera1Info.StreamUdp);
+            WriteIni("CAMERA", "cam1source", env.CameraEnv.IPCamera1Info.CameraSource);
+            WriteIni("CAMERA", "cam1usbmoniker", env.CameraEnv.IPCamera1Info.UsbMoniker ?? "");
+            WriteIni("CAMERA", "cam1usbname", env.CameraEnv.IPCamera1Info.UsbDeviceName ?? "");
+            WriteIni("CAMERA", "cam1usbwidth", env.CameraEnv.IPCamera1Info.UsbResolutionWidth);
+            WriteIni("CAMERA", "cam1usbheight", env.CameraEnv.IPCamera1Info.UsbResolutionHeight);
             //WriteIni("IPCAM1", "etcsave", env.CameraEnv.IPCamera1Info.ImageSave.EtcSave);
             //WriteIni("IPCAM1", "etcpath", env.CameraEnv.IPCamera1Info.ImageSave.EtcPath);
             WriteIni("CAMERA", "cam1interval", env.CameraEnv.IPCamera1Info.User_Setting_Resend_Interval);
@@ -574,6 +595,11 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "cam2rtspurl", env.CameraEnv.IPCamera2Info.RtspUrl ?? "");
             WriteIni("CAMERA", "cam2chname", env.CameraEnv.IPCamera2Info.ChName);
             WriteIni("CAMERA", "cam2udp", env.CameraEnv.IPCamera2Info.StreamUdp);
+            WriteIni("CAMERA", "cam2source", env.CameraEnv.IPCamera2Info.CameraSource);
+            WriteIni("CAMERA", "cam2usbmoniker", env.CameraEnv.IPCamera2Info.UsbMoniker ?? "");
+            WriteIni("CAMERA", "cam2usbname", env.CameraEnv.IPCamera2Info.UsbDeviceName ?? "");
+            WriteIni("CAMERA", "cam2usbwidth", env.CameraEnv.IPCamera2Info.UsbResolutionWidth);
+            WriteIni("CAMERA", "cam2usbheight", env.CameraEnv.IPCamera2Info.UsbResolutionHeight);
             //WriteIni("IPCAM2", "etcsave", env.CameraEnv.IPCamera2Info.ImageSave.EtcSave);
             //WriteIni("IPCAM2", "etcpath", env.CameraEnv.IPCamera2Info.ImageSave.EtcPath);
             WriteIni("CAMERA", "cam2interval", env.CameraEnv.IPCamera2Info.User_Setting_Resend_Interval);
@@ -735,6 +761,10 @@ namespace KyungsinLPR
                 WriteIni("COMMON", "gate2addport", "");
             WriteIni("COMMON", "gate2adddelay", env.CommonEnv.Dio.DioOutPut[1].AddDelay);
             WriteIni("COMMON", "gate2addkeep", env.CommonEnv.Dio.DioOutPut[1].AddKeep);
+
+            // DINGTIAN 이더넷 릴레이 보드 (IP/포트)
+            WriteIni("COMMON", "dioip", env.CommonEnv.Dio.DioSetting.IpAddress);
+            WriteIni("COMMON", "dionetport", env.CommonEnv.Dio.DioSetting.NetPort);
 
             //추가 포트
             WriteIni("COMMON", "Isolateuse", env.CommonEnv.Dio.IsolatePort.Out.Use);
@@ -1072,17 +1102,20 @@ namespace KyungsinLPR
 
         public static void SaveImage(String Source, String Destination, Rectangle rcPlateLoc)
         {
+            // [수정] using으로 image Dispose 보장 — 기존엔 Dispose 누락으로 파일 락 + GDI 누수
             try
             {
-                var image = Image.FromFile(Source);
-                PropertyItem pItem = image.PropertyItems[0];
-                pItem.Id = 0x9286;
-                pItem.Type = 2;// string
-                pItem.Value = Encoding.Default.GetBytes(string.Format("{0},{1},{2},{3}", rcPlateLoc.X, rcPlateLoc.Y, rcPlateLoc.Width, rcPlateLoc.Height));
-                Util.Logger.Log(string.Format("번호판 판독 좌표 {0},{1},{2},{3}", rcPlateLoc.X, rcPlateLoc.Y, rcPlateLoc.Width, rcPlateLoc.Height));
-                pItem.Len = pItem.Value.Length;
-                image.SetPropertyItem(pItem);
-                image.Save(Destination);
+                using (var image = Image.FromFile(Source))
+                {
+                    PropertyItem pItem = image.PropertyItems[0];
+                    pItem.Id = 0x9286;
+                    pItem.Type = 2;// string
+                    pItem.Value = Encoding.Default.GetBytes(string.Format("{0},{1},{2},{3}", rcPlateLoc.X, rcPlateLoc.Y, rcPlateLoc.Width, rcPlateLoc.Height));
+                    Util.Logger.Log(string.Format("번호판 판독 좌표 {0},{1},{2},{3}", rcPlateLoc.X, rcPlateLoc.Y, rcPlateLoc.Width, rcPlateLoc.Height));
+                    pItem.Len = pItem.Value.Length;
+                    image.SetPropertyItem(pItem);
+                    image.Save(Destination);
+                }
             }
             catch (FileNotFoundException e)
             {
@@ -1094,8 +1127,25 @@ namespace KyungsinLPR
             }
         }
 
+        /// <summary>
+        /// Image.FromFile은 파일 핸들을 잡아 락이 걸리고 Dispose 누락 시 누수가 발생한다.
+        /// 파일을 byte[]로 읽어 MemoryStream으로 디코딩 → 파일 핸들 즉시 해제.
+        /// 반환된 Image는 호출자가 Dispose 책임.
+        /// </summary>
+        public static Image LoadImageNoLock(string path)
+        {
+            byte[] data = File.ReadAllBytes(path);
+            var ms = new MemoryStream(data);
+            // 주의: Image가 stream을 지연 사용할 수 있어 stream을 닫지 않는다. Image.Dispose 시 함께 GC된다.
+            return Image.FromStream(ms);
+        }
+
         public static void SaveImage(String Source, String Destination, string PlateLoc, string Exposure, string PlateNo)
         {
+            // [수정] try-finally로 originalImage/bmpImage Dispose 보장
+            // (기존: bmpImage.Save에서 예외 발생 시 두 객체 모두 누수 — 차량 인식 빈도가 높을수록 GDI 핸들 폭증)
+            Image originalImage = null;
+            Bitmap bmpImage = null;
             try
             {
                 if (!File.Exists(Source))
@@ -1103,28 +1153,18 @@ namespace KyungsinLPR
                     Util.Logger.Log(string.Format("소스 이미지 없음"));
                     return;
                 }
-                //using (Image image = Image.FromFile(Directory.GetCurrentDirectory() + "\\" + Source))
-                //{
-                //    PropertyItem pItem = image.PropertyItems[0];
-                //    pItem.Id = 0x9286;
-                //    pItem.Type = 2;// string
-                //    pItem.Value = Encoding.Unicode.GetBytes(string.Format("{0} {1} {2} {3}", (PlateLoc + Exposure).Length + 1, PlateLoc, Exposure, PlateNo));
-                //    Util.Logger.Log(string.Format("번호판 판독 좌표 {0}", PlateLoc));
-                //    pItem.Len = pItem.Value.Length;
-                //    image.SetPropertyItem(pItem);
-                //    image.Save(Destination);
-                //}
                 Util.Logger.Log(string.Format("번호판 판독 좌표 {0} {1}", Source, PlateLoc));
-                System.Drawing.Image originalImage = System.Drawing.Image.FromFile(Source);
+                originalImage = System.Drawing.Image.FromFile(Source);
 
                 // Get the list of existing PropertyItems. i.e. the metadata
                 PropertyItem[] properties = originalImage.PropertyItems;
 
                 // Create a bitmap image to assign attributes and do whatever else..
-                Bitmap bmpImage = new Bitmap((Bitmap)originalImage);
+                bmpImage = new Bitmap((Bitmap)originalImage);
 
-                // Don't need this anymore
+                // 원본은 더 이상 불필요 — 즉시 해제 (finally 중복 dispose 방지로 null 대입)
                 originalImage.Dispose();
+                originalImage = null;
 
                 // Get / setup a PropertyItem
                 PropertyItem item = properties[0]; // We have to copy an existing one since no constructor exists
@@ -1144,9 +1184,6 @@ namespace KyungsinLPR
 
                 // Save the image
                 bmpImage.Save(Destination, System.Drawing.Imaging.ImageFormat.Jpeg);
-
-                //Clean up
-                bmpImage.Dispose();
                 Util.Logger.Log(string.Format("이미지 저장 완료 {0}", Destination));
             }
             catch (Exception SaveImage_Error)
@@ -1160,7 +1197,12 @@ namespace KyungsinLPR
                 {
                     Util.Logger.Log(string.Format("Copy Error {0}", err.Message));
                 }
-
+            }
+            finally
+            {
+                // 예외 발생 시에도 반드시 해제 — GDI 핸들/메모리 누수 방지
+                if (originalImage != null) originalImage.Dispose();
+                if (bmpImage != null) bmpImage.Dispose();
             }
         }
 

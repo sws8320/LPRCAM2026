@@ -29,7 +29,8 @@ namespace KyungsinLPR
             Sql += "iOutClient, iOutEqpm, iPayClient, iPayEqpm, iCardType, iInOutStatus, iRate, dShortAmount, iCardRate, dTransNo, dDebitAmount, dMisc1, dMisc2, dMisc3, ";
             Sql += "iOperator, dInsffcntPayout, iPaymentMode, dPasscardNo, dDebitCardNo, iInEqpmType, iOutEqpmType, acInTime, acUserName, acPlate1, acPlate2, ";
             Sql += "acTelNo, iGroup, dtMgmntDate, iExtendLotArea, dParkingAmount, acEntrancePicName, Dongcode, Hocode, iSrvrupdtFlag) \r\n";
-            Sql += string.Format("select {0}, {1}, {2}, 0, 0, '{3}', 0, 0, 0, 0, 0, 0, ", ParkInfo.No, ParkInfo.Client_No, LprInfo.EqpmNo, ProcTime.ToString("yyyy-MM-dd HH:mm:00"));
+            // 정기차량 입차 — iticket: CUSTDEF.iticket (정기권번호) 사용 (기존 0 하드코딩 수정)
+            Sql += string.Format("select {0}, {1}, {2}, 0, iticket, '{3}', 0, 0, 0, 0, 0, 0, ", ParkInfo.No, ParkInfo.Client_No, LprInfo.EqpmNo, ProcTime.ToString("yyyy-MM-dd HH:mm:00"));
             Sql += string.Format("0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, iticket, 0, 0, 0, '{0}', acusername, N'{3}', acplate2, '', igroup, '{1}', 0, 0, N'{2}', dongcode, hocode, 0 "
                 , ProcTime.ToString("HH:mm"), ProcTime.ToString("yyyy-MM-dd"), EntrancePic, Carno);
             Sql += string.Format("from {0}.dbo.custdef \r\n", frmLprMain.ENV.CommonEnv.DBInfo.MstDB);
@@ -444,37 +445,27 @@ namespace KyungsinLPR
 
         public static string SetEntranceFcStay(ClsStructure.Park_Info ParkInfo)
         {
-            String Sql = string.Empty; 
-            Sql = string.Format("if Not exists(select stay from {0}.dbo.fc_stay where iExtendLotArea = {1} and iLotArea = {1} and iClient = 0) ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
+            // iClient는 무시하고 iLotArea만 체크 — 클라이언트 단위로 카운트 분산 방지
+            String Sql = string.Empty;
+            Sql  = string.Format("if Not exists(select stay from {0}.dbo.fc_stay where iLotArea = {1}) ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
             Sql += string.Format(" INSERT INTO {0}.dbo.FC_STAY ( iExtendLotArea, iLotArea, iClient, Stay ) VALUES ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb);
-            //Sql += string.Format("({0}, {1}, {2}, {3}) ", ParkInfo.No, ParkInfo.No, ParkInfo.Client_No, 0);
-            Sql += string.Format("({0}, {1}, 0, {3}) ", ParkInfo.No, ParkInfo.No, ParkInfo.Client_No, 1);
+            Sql += string.Format("({0}, {1}, 0, 1) ", ParkInfo.No, ParkInfo.No);
             Sql += "else ";
-            Sql += string.Format(" UPDATE {0}.dbo.FC_STAY SET ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb);
-            Sql += " Stay = Stay + 1";
-            Sql += " WHERE ";
-            //Sql += string.Format(" iExtendLotArea = {0} and iLotArea = {0} and iClient = {1}",
-            Sql += string.Format(" iExtendLotArea = {0} and iLotArea = {0}",
-                ParkInfo.No, ParkInfo.Client_No);
-            //Util.Logger.Log(Sql);
+            Sql += string.Format(" UPDATE {0}.dbo.FC_STAY SET Stay = Stay + 1 WHERE iLotArea = {1}",
+                frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
             return Sql;
         }
 
         public static string SetExitFcStay(ClsStructure.Park_Info ParkInfo)
         {
+            // iClient는 무시하고 iLotArea만 체크 — 클라이언트 단위로 카운트 분산 방지
             String Sql = string.Empty;
-            Sql = string.Format("if Not exists(select stay from {0}.dbo.fc_stay where iExtendLotArea = {1} and iLotArea = {1} and iClient = 0) ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
+            Sql  = string.Format("if Not exists(select stay from {0}.dbo.fc_stay where iLotArea = {1}) ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
             Sql += string.Format(" INSERT INTO {0}.dbo.FC_STAY ( iExtendLotArea, iLotArea, iClient, Stay ) VALUES ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb);
-            //Sql += string.Format("({0}, {1}, {2}, {3}) ", ParkInfo.No, ParkInfo.No, ParkInfo.Client_No, 0);
-            Sql += string.Format("({0}, {1}, {2}, {3}) ", ParkInfo.No, ParkInfo.No, 0, 0);
+            Sql += string.Format("({0}, {1}, 0, 0) ", ParkInfo.No, ParkInfo.No);
             Sql += "else ";
-            Sql += string.Format(" UPDATE {0}.dbo.FC_STAY SET ", frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb);
-            Sql += " Stay = Stay - 1";
-            Sql += " WHERE ";
-            //Sql += string.Format(" iExtendLotArea = {0} and iLotArea = {1} and iClient = {2} and Stay > 0",
-            Sql += string.Format(" iExtendLotArea = {0} and iLotArea = {1} and Stay > 0",
-                ParkInfo.No, ParkInfo.No, ParkInfo.Client_No);
-            //Util.Logger.Log(Sql);
+            Sql += string.Format(" UPDATE {0}.dbo.FC_STAY SET Stay = Stay - 1 WHERE iLotArea = {1} and Stay > 0",
+                frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb, ParkInfo.No);
             return Sql;
         }
 

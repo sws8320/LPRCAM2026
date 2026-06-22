@@ -21,10 +21,6 @@ namespace KyungsinLPR
         private IPCamera Cam1;
         private IPCamera Cam2;
 
-        // 동영상 인식 방식 UI 컨트롤 (프로그래밍 방식으로 추가)
-        private System.Windows.Forms.ComboBox cmbRecogMode;
-        private System.Windows.Forms.TextBox txtRtsp1;
-        private System.Windows.Forms.TextBox txtRtsp2;
         //leess iNova2추가
         private iNova2.IPCamera Cam1_iNova2;
         private iNova2.IPCamera Cam2_iNova2;
@@ -50,8 +46,31 @@ namespace KyungsinLPR
             if(Environment.Is64BitProcess)
             {
                 rdbCore.Visible = true;
+                rdbOptionK.Visible = true;   // Option(K) 도 x64 전용
                 panel1.Visible = true;
+                // Option(K) 선택 시에도 CPU/GPU(panel1) 활성화되게 같은 핸들러 연결
+                rdbOptionK.CheckedChanged += new EventHandler(rdbCore_CheckedChanged);
             }
+            // 서버모드 체크 시에만 "서버 카메라 설정" 버튼 활성
+            // 서버 카메라 설정 그리드 메뉴 대신, '사용 대수'만 두고 개별설정은 카드 더블클릭으로.
+            btnServerCams.Visible = false;
+            lblCamCount = new Label { Text = "사용 대수", AutoSize = true, Location = new System.Drawing.Point(8, 116) };
+            cboCamCount = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList,
+                                         Location = new System.Drawing.Point(72, 112), Size = new System.Drawing.Size(56, 20) };
+            for (int i = 1; i <= ServerCamConfig.MAX; i++) cboCamCount.Items.Add(i.ToString());
+            groupBox11.Controls.Add(lblCamCount);
+            groupBox11.Controls.Add(cboCamCount);
+            // 카메라 개별설정용 '카드 표시 이름' 입력칸(탭 위쪽 빈 영역, perCam 모드만 표시)
+            lblCamCardName = new Label { Text = "카메라 이름", AutoSize = true, Location = new System.Drawing.Point(16, 11), Visible = false };
+            txtCamCardName = new TextBox { Location = new System.Drawing.Point(95, 8), Size = new System.Drawing.Size(220, 22), Visible = false };
+            this.Controls.Add(lblCamCardName);
+            this.Controls.Add(txtCamCardName);
+            // 원격 차번인식/이미지업로드안함 체크박스는 Designer(gbUpload)에 정의됨. 연동만 코드로:
+            //  '원격 차번인식 사용' 체크됐을 때만 '이미지 업로드 안함' 선택 가능.
+            chkOcrRemote.CheckedChanged += delegate {
+                chkOcrRemoteNoUpload.Enabled = chkOcrRemote.Checked;
+                if (!chkOcrRemote.Checked) chkOcrRemoteNoUpload.Checked = false;
+            };
             lstLprList.View = View.Details;
             lstLprList.FullRowSelect = true;
             lstLprList.GridLines = true;
@@ -88,8 +107,90 @@ namespace KyungsinLPR
             catch { }
         }
 
+        // DINGTIAN 이더넷 릴레이 보드 — 시리얼 미사용. 동적으로 IP/NetPort 입력 컨트롤 추가
+        private System.Windows.Forms.TextBox _txtDioIp;
+        private System.Windows.Forms.TextBox _txtDioNetPort;
+        private System.Windows.Forms.Label _lblDioIp;
+        private System.Windows.Forms.Label _lblDioNetPort;
+
+        private System.Windows.Forms.GroupBox _gbDingtian;
+
+        private void BuildDingtianControls()
+        {
+            // 차단기 설정 탭(tabGate)에서 groupBox6 옆 빈 공간(우측)에 DINGTIAN 전용 GroupBox 신설.
+            // groupBox6 자체는 그대로 두고(아래에 gbPass가 있어 height 확장 불가), IP/TCP포트 입력만 별도로 표시.
+            try
+            {
+                if (tabGate == null || groupBox6 == null) return;
+
+                _gbDingtian = new System.Windows.Forms.GroupBox();
+                _gbDingtian.Text = "DINGTIAN 이더넷 설정";
+                _gbDingtian.Location = new System.Drawing.Point(
+                    groupBox6.Location.X + groupBox6.Width + 10,
+                    groupBox6.Location.Y);
+                _gbDingtian.Size = new System.Drawing.Size(220, groupBox6.Height);
+                _gbDingtian.Name = "gbDingtian";
+
+                _lblDioIp = new System.Windows.Forms.Label();
+                _lblDioIp.AutoSize = true;
+                _lblDioIp.Location = new System.Drawing.Point(15, 28);
+                _lblDioIp.Text = "보드 IP";
+                _gbDingtian.Controls.Add(_lblDioIp);
+
+                _txtDioIp = new System.Windows.Forms.TextBox();
+                _txtDioIp.Location = new System.Drawing.Point(85, 25);
+                _txtDioIp.Size = new System.Drawing.Size(120, 21);
+                _txtDioIp.Name = "txtDioIp";
+                _gbDingtian.Controls.Add(_txtDioIp);
+
+                _lblDioNetPort = new System.Windows.Forms.Label();
+                _lblDioNetPort.AutoSize = true;
+                _lblDioNetPort.Location = new System.Drawing.Point(15, 58);
+                _lblDioNetPort.Text = "TCP 포트";
+                _gbDingtian.Controls.Add(_lblDioNetPort);
+
+                _txtDioNetPort = new System.Windows.Forms.TextBox();
+                _txtDioNetPort.Location = new System.Drawing.Point(85, 55);
+                _txtDioNetPort.Size = new System.Drawing.Size(80, 21);
+                _txtDioNetPort.Name = "txtDioNetPort";
+                _txtDioNetPort.Text = "60001";
+                _gbDingtian.Controls.Add(_txtDioNetPort);
+
+                System.Windows.Forms.Label hint = new System.Windows.Forms.Label();
+                hint.AutoSize = false;
+                hint.Location = new System.Drawing.Point(15, 85);
+                hint.Size = new System.Drawing.Size(195, 30);
+                hint.Text = "출력: TCP/UDP 60001 ASCII\r\n입력: HTTP /input.cgi 폴링";
+                hint.ForeColor = System.Drawing.Color.Gray;
+                _gbDingtian.Controls.Add(hint);
+
+                tabGate.Controls.Add(_gbDingtian);
+                _gbDingtian.BringToFront();
+            }
+            catch (Exception ex) { Util.Logger.Log("BuildDingtianControls 실패: " + ex.Message); }
+        }
+
+        private void UpdateDioFieldsByType()
+        {
+            // DINGTIAN(이더넷)이면 시리얼/프로토콜/보드타입 비활성, IP/Port 활성. 그 외 반대
+            try
+            {
+                bool isDingtian = false;
+                if (cmbDioType.SelectedItem != null)
+                    isDingtian = ((int)cmbDioType.SelectedItem) == (int)ClsStructure.DeviceList.DINGTIAN;
+                cmbDioPort.Enabled = !isDingtian;
+                txtDioSetting.Enabled = !isDingtian;
+                cmbBoardType.Enabled = !isDingtian;
+                if (_gbDingtian != null) _gbDingtian.Enabled = isDingtian;
+                if (_txtDioIp != null) _txtDioIp.Enabled = isDingtian;
+                if (_txtDioNetPort != null) _txtDioNetPort.Enabled = isDingtian;
+            }
+            catch { }
+        }
+
         private void frmEnv_Load(object sender, EventArgs e)
         {
+            BuildDingtianControls();
             cmbDioType.DataSource = Enum.GetValues(typeof(ClsStructure.DeviceList));
             //cmbMessageType.DataSource = Enum.GetValues(typeof(ClsStructure.MessageType));
             cmbBoardType.DataSource = Enum.GetValues(typeof(ClsStructure.DeviceType));
@@ -111,8 +212,8 @@ namespace KyungsinLPR
             ssdpSession.SetupSSDPSessions();
             ssdpSession.IpUpdated += IpUpdated;
             CarRegTypeGridInit();
-            InitVideoModeControls();
             setEnv();
+            ApplyServerModeUi();   // 서버모드면 공통 설정만 활성(나머지 비활성)
             gbAuthentication.Visible = !env.CommonEnv.Authentication;
             for (int i = 1; i <= 10; i++)
             {
@@ -135,47 +236,13 @@ namespace KyungsinLPR
             chkBusinessExitGateOpen.Checked = clsBusinessCar.UseExitGateOpen;
             chkBusinessExitSendData.Checked = clsBusinessCar.UseExitSocketDataSend;
             txtBusinessDisplayMent.Text = clsBusinessCar.DisPlayLineMent;
-        }
 
-        private void InitVideoModeControls()
-        {
-            // groupBox8 에 동영상 인식 방식 설정 컨트롤을 동적으로 추가
-            var lblRecogMode = new System.Windows.Forms.Label();
-            lblRecogMode.Text = "인식 방식:";
-            lblRecogMode.Location = new System.Drawing.Point(6, 289);
-            lblRecogMode.Size = new System.Drawing.Size(65, 17);
-            groupBox8.Controls.Add(lblRecogMode);
+            InitUsbExtension(); // USB 카메라 설정 컨트롤 동적 추가
 
-            cmbRecogMode = new System.Windows.Forms.ComboBox();
-            cmbRecogMode.Items.Add("스트로브 방식");
-            cmbRecogMode.Items.Add("동영상 방식(FAVEngine)");
-            cmbRecogMode.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            cmbRecogMode.SelectedIndex = 0;
-            cmbRecogMode.Location = new System.Drawing.Point(75, 286);
-            cmbRecogMode.Size = new System.Drawing.Size(185, 21);
-            groupBox8.Controls.Add(cmbRecogMode);
-
-            var lblRtsp1 = new System.Windows.Forms.Label();
-            lblRtsp1.Text = "CAM1 RTSP:";
-            lblRtsp1.Location = new System.Drawing.Point(6, 314);
-            lblRtsp1.Size = new System.Drawing.Size(72, 17);
-            groupBox8.Controls.Add(lblRtsp1);
-
-            txtRtsp1 = new System.Windows.Forms.TextBox();
-            txtRtsp1.Location = new System.Drawing.Point(82, 311);
-            txtRtsp1.Size = new System.Drawing.Size(180, 21);
-            groupBox8.Controls.Add(txtRtsp1);
-
-            var lblRtsp2 = new System.Windows.Forms.Label();
-            lblRtsp2.Text = "CAM2 RTSP:";
-            lblRtsp2.Location = new System.Drawing.Point(6, 339);
-            lblRtsp2.Size = new System.Drawing.Size(72, 17);
-            groupBox8.Controls.Add(lblRtsp2);
-
-            txtRtsp2 = new System.Windows.Forms.TextBox();
-            txtRtsp2.Location = new System.Drawing.Point(82, 336);
-            txtRtsp2.Size = new System.Drawing.Size(180, 21);
-            groupBox8.Controls.Add(txtRtsp2);
+            // [중요] setEnv()(전역값)로 컨트롤을 모두 채운 '이후'에 서버모드 개별값/필터를 적용.
+            //  (SetServerCamMode 는 ShowDialog 전에 호출되어 이 Load 보다 먼저 실행되므로 여기서 다시 적용)
+            if (_serverCamIndex >= 0)
+                ApplyServerCamConfig();
         }
 
         private void setEnv()
@@ -297,6 +364,9 @@ namespace KyungsinLPR
                 case (int)ClsStructure.RegModule.CoreLogic:
                     rdbCore.Checked = true;
                     break;
+                case (int)ClsStructure.RegModule.OptionK:
+                    rdbOptionK.Checked = true;
+                    break;
             }
 
             switch (env.CameraEnv.CoreType)
@@ -320,12 +390,9 @@ namespace KyungsinLPR
             chkRegCarType.Checked = env.CameraEnv.bRegCarType;
 
             // 동영상 인식 방식 설정 로드
-            if (cmbRecogMode != null)
-            {
-                cmbRecogMode.SelectedIndex = (env.CameraEnv.RecogMode == 1) ? 1 : 0;
-                txtRtsp1.Text = env.CameraEnv.IPCamera1Info.RtspUrl ?? "";
-                txtRtsp2.Text = env.CameraEnv.IPCamera2Info.RtspUrl ?? "";
-            }
+            cmbRecogMode.SelectedIndex = (env.CameraEnv.RecogMode == 1) ? 1 : 0;
+            txtRtsp1.Text = env.CameraEnv.IPCamera1Info.RtspUrl ?? "";
+            txtRtsp2.Text = env.CameraEnv.IPCamera2Info.RtspUrl ?? "";
 
             foreach (ClsStructure.SmallCarRate item in env.CameraEnv.RegCarRate)
             {
@@ -417,6 +484,9 @@ namespace KyungsinLPR
             txtDioSetting.Text = env.CommonEnv.Dio.DioSetting.Setting;
             cmbDioType.Text = env.CommonEnv.Dio.DioSetting.Dev_Type_Name;
             cmbBoardType.SelectedItem = env.CommonEnv.Dio.DioSetting.Type.Equals(true) ? ClsStructure.DeviceType.이벤트 : ClsStructure.DeviceType.리얼;
+            if (_txtDioIp != null) _txtDioIp.Text = env.CommonEnv.Dio.DioSetting.IpAddress;
+            if (_txtDioNetPort != null) _txtDioNetPort.Text = (env.CommonEnv.Dio.DioSetting.NetPort > 0 ? env.CommonEnv.Dio.DioSetting.NetPort : 60001).ToString();
+            UpdateDioFieldsByType();
 
             if (env.CommonEnv.Dio.DioOutPut[0].Use && env.CommonEnv.Dio.DioOutPut[0].Keep < 500)
                 env.CommonEnv.Dio.DioOutPut[0].Keep = 500;
@@ -613,6 +683,7 @@ namespace KyungsinLPR
             txtPenaltyment.Text = env.RegCarControl.Penaltiment;
 
             chkGateGroupUse.Checked = env.RegCarControl.UseGroupGate;
+            chkExitGroupGateUse.Checked = env.RegCarControl.UseExitGroupGate;
             txtGroupNo.Text = env.RegCarControl.GateGroupNo.ToString();
             lstGroup.View = View.Details;
             lstGroup.GridLines = true;
@@ -653,93 +724,208 @@ namespace KyungsinLPR
 
             //leess 긴급차량 개방
             checkEmergencyCar.Checked = env.EmergencyCar;
+
+            // 이미지 업로드 (ParkingWeb) 설정 로드 — Setting.ini [UPLOAD] 섹션
+            try
+            {
+                string en = Util.Function.IniReadValue("UPLOAD", "enabled") ?? "";
+                chkUploadEnabled.Checked = en.Equals("true", StringComparison.OrdinalIgnoreCase) || en == "1";
+                txtUploadServerUrl.Text  = Util.Function.IniReadValue("UPLOAD", "serverurl") ?? "";
+                txtUploadApiKey.Text     = Util.Function.IniReadValue("UPLOAD", "apikey") ?? "";
+
+                // 서버모드(멀티카메라 카드 화면) — [OPTIONK] servermode
+                string sm = Util.Function.IniReadValue("OPTIONK", "servermode") ?? "";
+                if (sm.Equals("true", StringComparison.OrdinalIgnoreCase) || sm == "1")
+                    rdbServerMode.Checked = true;   // 서버모드 선택(시작모드 라디오는 자동 해제)
+                // 원격 차번인식 사용 — [OPTIONK] remote (서버모드와 별개; 서버 URL/키는 [UPLOAD] 재사용)
+                string rm = Util.Function.IniReadValue("OPTIONK", "remote") ?? "";
+                if (chkOcrRemote != null) chkOcrRemote.Checked = (rm.Equals("true", StringComparison.OrdinalIgnoreCase) || rm == "1");
+                // 원격 차번인식만 사용(이미지 업로드 안함) — [OPTIONK] remote_noupload
+                string rmnu = Util.Function.IniReadValue("OPTIONK", "remote_noupload") ?? "";
+                if (chkOcrRemoteNoUpload != null) {
+                    chkOcrRemoteNoUpload.Enabled = (chkOcrRemote != null && chkOcrRemote.Checked);
+                    chkOcrRemoteNoUpload.Checked = chkOcrRemoteNoUpload.Enabled &&
+                        (rmnu.Equals("true", StringComparison.OrdinalIgnoreCase) || rmnu == "1");
+                }
+                // 서버모드 사용 카메라 대수 로드(기본 2)
+                int camCnt = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
+                if (camCnt < 1 || camCnt > ServerCamConfig.MAX) camCnt = 2;
+                cboCamCount.SelectedItem = camCnt.ToString();
+            }
+            catch (Exception) { }
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            // SSDP 타이머/이벤트 정리 — 폼 닫힌 후에도 OnTimer가 발사되어 이벤트 핸들러가
+            // 죽은 ListBox에 접근하면 NRE 발생 (관찰 사례). Stop으로 타이머 중지 + 이벤트 클리어.
+            try
+            {
+                if (ssdpSession != null)
+                {
+                    ssdpSession.IpUpdated -= IpUpdated;
+                    ssdpSession.Stop();
+                }
+            }
+            catch (Exception ex)
+            {
+                try { Util.Logger.Log("[frmEnv.OnFormClosed] " + ex.Message); } catch { }
+            }
+            base.OnFormClosed(e);
         }
 
         private void IpUpdated(object sender, IpUpdatedEventArgs arg)
         {
-            UpdateItemToList(listCamIPlist, arg);
+            // SSDP 타이머는 폼 닫힌 뒤에도 발사될 수 있음 — 폼/리스트 상태 가드
+            if (this.IsDisposed) return;
+            if (arg == null || string.IsNullOrEmpty(arg.ipAddress)) return;
+            if (listCamIPlist == null || listCamIPlist.IsDisposed) return;
+            try { UpdateItemToList(listCamIPlist, arg); }
+            catch (Exception ex) { Util.Logger.Log("[frmEnv.IpUpdated] " + ex.Message); }
         }
 
         delegate void UpdateItemToListCallback(ListBox list, IpUpdatedEventArgs arg);
 
         private void UpdateItemToList(ListBox list, IpUpdatedEventArgs arg)
         {
-            if (list.InvokeRequired)
+            if (list == null || list.IsDisposed) return;
+            if (arg == null || string.IsNullOrEmpty(arg.ipAddress)) return;
+
+            // 핸들 미생성 상태에서 InvokeRequired 자체가 throw할 수 있음 — try로 보호
+            bool needsInvoke;
+            try { needsInvoke = list.InvokeRequired; }
+            catch { return; }
+
+            if (needsInvoke)
             {
+                if (!list.IsHandleCreated || this.IsDisposed) return;
                 var d = new UpdateItemToListCallback(UpdateItemToList);
-                try
-                {
-                    this.BeginInvoke(d, new object[] { list, arg });
-                }
+                try { this.BeginInvoke(d, new object[] { list, arg }); }
                 catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { /* 핸들 파괴 */ }
             }
             else
             {
-                if (arg.added && !list.Items.Contains(arg.ipAddress))
+                try
                 {
-                    list.Items.Add(arg.ipAddress);
+                    if (arg.added && !list.Items.Contains(arg.ipAddress))
+                        list.Items.Add(arg.ipAddress);
+                    else if (!arg.added && list.Items.Contains(arg.ipAddress))
+                        list.Items.Remove(arg.ipAddress);
                 }
-                else if (!arg.added && list.Items.Contains(arg.ipAddress))
+                catch (Exception ex)
                 {
-                    list.Items.Remove(arg.ipAddress);
+                    Util.Logger.Log("[frmEnv.UpdateItemToList] " + ex.Message);
                 }
             }
         }
 
         private void btnSetROI_Click(object sender, EventArgs e)
         {
-            frmPicConfig frm = null;
-            switch (groupBox1.Text)
+            // 서버캠 개별설정(인덱스 2~14): 카드 스냅샷 이미지에 ROI 설정 → [SVRCAM{n}] 저장
+            if (_serverCamIndex >= 2)
             {
-                case "1번 카메라 설정":
-                    frm = new frmPicConfig(env, 1);
-                    break;
-                case "2번 카메라 설정":
-                    frm = new frmPicConfig(env, 2);
-                    break;
-            }
-            DialogResult ret = frm.ShowDialog();
-            if (ret == System.Windows.Forms.DialogResult.OK)
-            {
-                switch (groupBox1.Text)
+                if (string.IsNullOrEmpty(_serverCamRoiImage) || !System.IO.File.Exists(_serverCamRoiImage))
                 {
-                    case "1번 카메라 설정":
-                        env.CameraEnv.IPCamera1Info.Roi = frm.RoiRect;
-                        Util.Function.IniWriteValue("CAMERA", "cam1roi", String.Format("{0}, {1}, {2}, {3}", env.CameraEnv.IPCamera1Info.Roi.X, env.CameraEnv.IPCamera1Info.Roi.Y, env.CameraEnv.IPCamera1Info.Roi.Width, env.CameraEnv.IPCamera1Info.Roi.Height));
-                        break;
-                    case "2번 카메라 설정":
-                        env.CameraEnv.IPCamera2Info.Roi = frm.RoiRect;
-                        Util.Function.IniWriteValue("CAMERA", "cam2roi", String.Format("{0}, {1}, {2}, {3}", env.CameraEnv.IPCamera2Info.Roi.X, env.CameraEnv.IPCamera2Info.Roi.Y, env.CameraEnv.IPCamera2Info.Roi.Width, env.CameraEnv.IPCamera2Info.Roi.Height));
-                        break;
+                    MessageBox.Show("영역설정용 카메라 영상이 없습니다.\n(카드에 영상이 표시된 상태에서 다시 시도하세요)", "영역 설정",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                string sec = "SVRCAM" + (_serverCamIndex + 1);
+                System.Drawing.Rectangle cur = ParseRoiRect(Util.Function.IniReadValue(sec, "roi"));
+                frmPicConfig sfrm = new frmPicConfig(env, _serverCamRoiImage, cur);
+                if (sfrm.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    System.Drawing.Rectangle r = sfrm.RoiRect;
+                    string s = String.Format("{0},{1},{2},{3}", r.X, r.Y, r.Width, r.Height);
+                    Util.Function.IniWriteValue(sec, "roi", s);
+                    Util.Function.IniWriteValue(sec, "pc_roi", s);
+                    Util.Logger.Log(string.Format("[서버모드] 카메라{0} 영역설정 저장 {1}", _serverCamIndex + 1, s));
+                    MessageBox.Show("영역이 저장되었습니다.", "영역 설정", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                return;
+            }
+            // 대상 카메라 번호: 그룹 텍스트 우선, 없으면 개별설정 인덱스(카드1=cam1, 카드2=cam2)
+            int camNo = 0;
+            if (groupBox1.Text == "1번 카메라 설정") camNo = 1;
+            else if (groupBox1.Text == "2번 카메라 설정") camNo = 2;
+            else if (_serverCamIndex == 0) camNo = 1;
+            else if (_serverCamIndex == 1) camNo = 2;
+            if (camNo == 0)
+            {
+                MessageBox.Show("영역설정 대상 카메라를 확인할 수 없습니다.\n(실제 카메라 1/2만 지원)", "영역 설정",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            frmPicConfig frm = new frmPicConfig(env, camNo);
+            if (frm.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                System.Drawing.Rectangle r = frm.RoiRect;
+                string roiStr = String.Format("{0}, {1}, {2}, {3}", r.X, r.Y, r.Width, r.Height);
+                if (camNo == 1)
+                {
+                    env.CameraEnv.IPCamera1Info.Roi = r;
+                    Util.Function.IniWriteValue("CAMERA", "cam1roi", roiStr);
+                }
+                else
+                {
+                    env.CameraEnv.IPCamera2Info.Roi = r;
+                    Util.Function.IniWriteValue("CAMERA", "cam2roi", roiStr);
                 }
             }
         }
 
+        // "x,y,w,h"(공백 허용) → Rectangle. 실패 시 빈 사각형.
+        private static System.Drawing.Rectangle ParseRoiRect(string s)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(s)) return System.Drawing.Rectangle.Empty;
+                string[] p = s.Split(',');
+                if (p.Length < 4) return System.Drawing.Rectangle.Empty;
+                return new System.Drawing.Rectangle(
+                    Util.Function.IntTryParse(p[0].Trim()), Util.Function.IntTryParse(p[1].Trim()),
+                    Util.Function.IntTryParse(p[2].Trim()), Util.Function.IntTryParse(p[3].Trim()));
+            }
+            catch { return System.Drawing.Rectangle.Empty; }
+        }
+
         private void btnCamSetup_Click(object sender, EventArgs e)
         {
-            //leess iNova2추가
-            if(env.CameraEnv.iNovaType == 1) {
-                frmAdvFeature frm = null;
-                switch(groupBox1.Text) {
-                    case "1번 카메라 설정":
-                        frm = new frmAdvFeature(Cam1);
-                        break;
-                    case "2번 카메라 설정":
-                        frm = new frmAdvFeature(Cam2);
-                        break;
+            try
+            {
+                // 서버캠 개별설정(인덱스 2~14): 라이브 서버카메라 디바이스로 고급설정(iNova2)
+                if (_serverCamIndex >= 2)
+                {
+                    if (_serverCamDev == null)
+                    {
+                        MessageBox.Show("서버 카메라 연결이 없어 고급설정을 열 수 없습니다.\n(카메라 IP/연결 확인)", "카메라 설정",
+                                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    new iNova2.frmAdvFeature(_serverCamDev).ShowDialog();
+                    return;
                 }
-                frm.ShowDialog();
-            } else if(env.CameraEnv.iNovaType == 2) {
-                iNova2.frmAdvFeature frm = null;
-                switch(groupBox1.Text) {
-                    case "1번 카메라 설정":
-                        frm = new iNova2.frmAdvFeature(Cam1_iNova2);
-                        break;
-                    case "2번 카메라 설정":
-                        frm = new iNova2.frmAdvFeature(Cam2_iNova2);
-                        break;
+                // 대상 카메라(0/1) 판정 — perCam 에서는 groupBox1.Text 기본값이라 _serverCamIndex 로 보완
+                bool isCam1 = groupBox1.Text == "1번 카메라 설정" || _serverCamIndex == 0;
+                bool isCam2 = groupBox1.Text == "2번 카메라 설정" || _serverCamIndex == 1;
+                if (env.CameraEnv.iNovaType == 1)
+                {
+                    frmAdvFeature frm = isCam1 ? new frmAdvFeature(Cam1) : isCam2 ? new frmAdvFeature(Cam2) : null;
+                    if (frm == null) { MessageBox.Show("대상 카메라를 확인할 수 없습니다."); return; }
+                    frm.ShowDialog();
                 }
-                frm.ShowDialog();
+                else if (env.CameraEnv.iNovaType == 2)
+                {
+                    iNova2.frmAdvFeature frm = isCam1 ? new iNova2.frmAdvFeature(Cam1_iNova2) : isCam2 ? new iNova2.frmAdvFeature(Cam2_iNova2) : null;
+                    if (frm == null) { MessageBox.Show("대상 카메라를 확인할 수 없습니다."); return; }
+                    frm.ShowDialog();
+                }
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Log("카메라 고급설정 오류: " + ex.Message);
+                MessageBox.Show("카메라 설정 오류: " + ex.Message, "카메라 설정", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -893,6 +1079,7 @@ namespace KyungsinLPR
             //cmbTriggerMode.SelectedIndex = cnt;
             txtFrameRate.Text = env.CameraEnv.IPCamera1Info.FrameRate.ToString();
             cmbTriggerMode.SelectedIndex = env.CameraEnv.IPCamera1Info.TriggerMode;
+            RefreshUsbExtensionForCam(1);
         }
 
         private void btnCam2_Click(object sender, EventArgs e)
@@ -1026,23 +1213,42 @@ namespace KyungsinLPR
             //Cam Current Info
             int cnt = 0;
             bool blBarakect = false;
-            Cam2.GetTriggerImageCount(out cnt);
-            cmbTriggerCnt.Text = cnt.ToString();
-            Cam2.GetBracketMode(out blBarakect, out cnt);
-            cmbBrakectCnt.Text = cnt.ToString();
-            double frame = 0;
-            Cam2.GetFrameRate(out frame);
-            txtFrameRate.Text = frame.ToString();
-            Cam2.GetTriggerMode(out cnt, out blBarakect);
-            cmbTriggerMode.SelectedIndex = cnt;
+            // USB 카메라이거나 IP 미연결이면 iNova SDK 호출 시 예외 가능 — try 가드
+            if (env.CameraEnv.IPCamera2Info.CameraSource != (int)ClsStructure.CameraSourceType.USB)
+            {
+                try
+                {
+                    Cam2.GetTriggerImageCount(out cnt);
+                    cmbTriggerCnt.Text = cnt.ToString();
+                    Cam2.GetBracketMode(out blBarakect, out cnt);
+                    cmbBrakectCnt.Text = cnt.ToString();
+                    double frame = 0;
+                    Cam2.GetFrameRate(out frame);
+                    txtFrameRate.Text = frame.ToString();
+                    Cam2.GetTriggerMode(out cnt, out blBarakect);
+                    cmbTriggerMode.SelectedIndex = cnt;
+                }
+                catch (Exception ex) { Util.Logger.Log("[btnCam2_Click] iNova SDK 호출 실패: " + ex.Message); }
+            }
             cmbTriggerCnt.Text = env.CameraEnv.IPCamera2Info.TriggerCnt.ToString();
             cmbBrakectCnt.Text = env.CameraEnv.IPCamera2Info.BarkectCnt.ToString();
             txtFrameRate.Text = env.CameraEnv.IPCamera2Info.FrameRate.ToString();
             cmbTriggerMode.SelectedIndex = env.CameraEnv.IPCamera2Info.TriggerMode;
+            RefreshUsbExtensionForCam(2);
         }
 
         private void btnEnvSave_Click(object sender, EventArgs e)
         {
+            // 카메라 개별설정 모드: 전역 설정을 저장하지 않고 [SVRCAM{n}]에만 별도 기록(창은 유지)
+            if (_serverCamIndex >= 0)
+            {
+                SaveServerCam(_serverCamIndex);
+                // DialogResult 설정하면 ShowDialog 폼이 닫히므로 설정하지 않음(창 유지)
+                MessageBox.Show("카메라 개별설정이 저장되었습니다.", "서버모드",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;   // 창 유지 — 종료는 '닫기' 버튼으로
+            }
+
             IPAddress address;
             if (chkDisplay1NetUse.Checked && !IPAddress.TryParse(txtDisplay1NetIp.Text, out address))
             {
@@ -1082,6 +1288,8 @@ namespace KyungsinLPR
             {
                 case "1번 카메라 설정":
                     //leess iNova2추가
+                    // USB 카메라이면 iNova SDK 호출 스킵
+                    if(env.CameraEnv.IPCamera1Info.CameraSource == (int)ClsStructure.CameraSourceType.USB) break;
                     if(env.CameraEnv.iNovaType == 1) {
                         Cam1.GetTriggerImageCount(out triggerCnt);
                         if(triggerCnt != Util.Function.IntTryParse(cmbTriggerCnt.Text))
@@ -1114,6 +1322,8 @@ namespace KyungsinLPR
                     break;
                 case "2번 카메라 설정":
                     //leess iNova2추가
+                    // USB 카메라이면 iNova SDK 호출 스킵
+                    if(env.CameraEnv.IPCamera2Info.CameraSource == (int)ClsStructure.CameraSourceType.USB) break;
                     if(env.CameraEnv.iNovaType == 1) {
                         Cam2.GetTriggerImageCount(out triggerCnt);
                         if(triggerCnt != Util.Function.IntTryParse(cmbTriggerCnt.Text))
@@ -1151,6 +1361,7 @@ namespace KyungsinLPR
             else
                 clsExceptGroup.Set_Except_Group("-1");
 
+            ApplyUsbStateToEnv(); // USB 카메라 상태를 ENV 구조체에 반영
             //leess ini에 저장
             func.SetEnv(env);
 
@@ -1208,6 +1419,7 @@ namespace KyungsinLPR
             env.RegCarControl.Ilotarea = chkiLotarea.Checked;
 
             env.RegCarControl.UseGroupGate = chkGateGroupUse.Checked;
+            env.RegCarControl.UseExitGroupGate = chkExitGroupGateUse.Checked;
             int itmp = 0;
             int.TryParse(txtGroupNo.Text, out itmp);
             env.RegCarControl.GateGroupNo = itmp;
@@ -1223,6 +1435,24 @@ namespace KyungsinLPR
             env.RegCarControl.GroupEnd = mskGroupTo.Text;
             env.RegCarControl.Save(env.RegCarControl);
             #endregion
+
+            // 이미지 업로드 (ParkingWeb) 설정 저장 + 워커 재기동
+            try
+            {
+                clsImageUploader.SaveIni(chkUploadEnabled.Checked, txtUploadServerUrl.Text, txtUploadApiKey.Text);
+                // 서버모드(카드 화면) → servermode, 원격 차번인식 → remote (별개 저장)
+                Util.Function.IniWriteValue("OPTIONK", "servermode", rdbServerMode.Checked.ToString());
+                if (chkOcrRemote != null)
+                    Util.Function.IniWriteValue("OPTIONK", "remote", chkOcrRemote.Checked.ToString());
+                // 원격 차번인식만 사용(이미지 업로드 안함) — remote 체크 시에만 유효
+                bool ocrNoUpload = chkOcrRemoteNoUpload != null && chkOcrRemoteNoUpload.Checked && chkOcrRemote != null && chkOcrRemote.Checked;
+                Util.Function.IniWriteValue("OPTIONK", "remote_noupload", ocrNoUpload.ToString());
+                clsImageUploader.Reload();   // remote_noupload 기록 후 재기동(SaveIni의 Reload는 이 값 기록 전이라 한 번 더)
+                // 서버모드 사용 카메라 대수 저장
+                if (cboCamCount != null && cboCamCount.SelectedItem != null)
+                    Util.Function.IniWriteValue("OPTIONK", "camcount", cboCamCount.SelectedItem.ToString());
+            }
+            catch (Exception) { }
         }
 
         private void frmEnv_KeyUp(object sender, KeyEventArgs e)
@@ -1341,8 +1571,10 @@ namespace KyungsinLPR
             env.CommunicationEnv.ImageSave.Use = ckbImageUse.Checked;
             env.CommunicationEnv.ImageSave.SavePath = txtComSavePath.Text;
 
-            //동작모드(공통) : 카메라서버/자료처리/카메라서버+자료처리
-            if (rdStartCam.Checked)
+            //동작모드(공통) : 카메라서버/자료처리/카메라서버+자료처리/서버모드
+            if (rdbServerMode.Checked)
+                env.StartType = (int)ClsStructure.ProgramStartType.BOTH;   // 서버모드는 전체 실행(인식만 ParkingWeb)
+            else if (rdStartCam.Checked)
                 env.StartType = (int)ClsStructure.ProgramStartType.CAM;
             else if (rdStartCom.Checked)
                 env.StartType = (int)ClsStructure.ProgramStartType.COM;
@@ -1628,14 +1860,13 @@ namespace KyungsinLPR
                 env.CameraEnv.RegModule = (int)ClsStructure.RegModule.Ngis;
             else if (rdbCore.Checked)
                 env.CameraEnv.RegModule = (int)ClsStructure.RegModule.CoreLogic;
+            else if (rdbOptionK.Checked)
+                env.CameraEnv.RegModule = (int)ClsStructure.RegModule.OptionK;
 
             // 동영상 인식 방식 설정 저장
-            if (cmbRecogMode != null)
-            {
-                env.CameraEnv.RecogMode = cmbRecogMode.SelectedIndex;
-                env.CameraEnv.IPCamera1Info.RtspUrl = txtRtsp1.Text;
-                env.CameraEnv.IPCamera2Info.RtspUrl = txtRtsp2.Text;
-            }
+            env.CameraEnv.RecogMode = cmbRecogMode.SelectedIndex;
+            env.CameraEnv.IPCamera1Info.RtspUrl = txtRtsp1.Text;
+            env.CameraEnv.IPCamera2Info.RtspUrl = txtRtsp2.Text;
 
             if (rdbCpu.Checked)
                 env.CameraEnv.CoreType = (int)ClsStructure.CoreType.CPU;
@@ -1742,6 +1973,12 @@ namespace KyungsinLPR
                 env.CommonEnv.Dio.DioSetting.Type = true;
             else if (cmbBoardType.SelectedItem.Equals(ClsStructure.DeviceType.리얼))
                 env.CommonEnv.Dio.DioSetting.Type = false;
+            if (_txtDioIp != null) env.CommonEnv.Dio.DioSetting.IpAddress = _txtDioIp.Text.Trim();
+            if (_txtDioNetPort != null)
+            {
+                int np = Util.Function.IntTryParse(_txtDioNetPort.Text);
+                env.CommonEnv.Dio.DioSetting.NetPort = np > 0 ? np : 60001;
+            }
 
             if (ChkGate1Use.Checked && Util.Function.IntTryParse(txtGate1PortKeep.Text) < 500)
                 txtGate1PortKeep.Text = "500";
@@ -1932,7 +2169,21 @@ namespace KyungsinLPR
                     CmbGate2AddPort.Items.AddRange(new string[] { "", "0", "1", "2", "3", "4", "5", "6" });
                     cmbFixedPort.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6" });
                     break;
+                case (int)ClsStructure.DeviceList.DINGTIAN:
+                    // 8채널 이더넷 릴레이. 입력/출력 모두 LPR과 동일하게 1~8(1-based)로 사용 (ClsDingtian이 내부에서 ch+1 매핑)
+                    cmbLoop.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    cmbSmallCar.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    CmbGate1Port.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    CmbGate2Port.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    CmbGate1AddPort.Items.AddRange(new string[] { "", "1", "2", "3", "4", "5", "6", "7", "8" });
+                    CmbGate2AddPort.Items.AddRange(new string[] { "", "1", "2", "3", "4", "5", "6", "7", "8" });
+                    cmbFixedPort.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    cmbIsolateOutport.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    cmbIsolatePortAdd.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    cmbIsolateInPort.Items.AddRange(new string[] { "1", "2", "3", "4", "5", "6", "7", "8" });
+                    break;
             }
+            UpdateDioFieldsByType();
         }
 
         private void chkSmallCar_CheckedChanged(object sender, EventArgs e)
@@ -2646,9 +2897,230 @@ namespace KyungsinLPR
 
         private void rdbCore_CheckedChanged(object sender, EventArgs e)
         {
-            panel1.Enabled = rdbCore.Checked;
+            // CPU/GPU(panel1) 는 Option(C) 또는 Option(K) 에서 사용
+            panel1.Enabled = rdbCore.Checked || rdbOptionK.Checked;
             panel5.Enabled = rdbCore.Checked;
             chkRegCarType.Enabled = rdbCore.Checked;
+        }
+
+        // 서버모드 카메라(최대 15대) 설정 다이얼로그 열기
+        private void btnServerCams_Click(object sender, EventArgs e)
+        {
+            using (var f = new frmServerCams())
+            {
+                f.ShowDialog(this);
+            }
+        }
+
+        private int _serverCamIndex = -1;   // -1=일반/공통, >=0=카메라 개별설정 모드(인덱스)
+        private iNova2.IPCamera _serverCamDev;   // 개별설정 시 라이브 서버카메라 디바이스(고급설정용)
+        private string _serverCamRoiImage;       // 개별설정 시 영역설정용 스냅샷 이미지 경로
+
+        /// <summary>카드 더블클릭 개별설정 시 라이브 서버카메라 디바이스/스냅샷 주입(frmLprMain).</summary>
+        public void SetServerCamDevice(iNova2.IPCamera dev, string roiImagePath)
+        {
+            _serverCamDev = dev;
+            _serverCamRoiImage = roiImagePath;
+        }
+        private ComboBox cboCamCount;       // 서버모드 사용 카메라 대수(1~15) — 코드 생성
+        private Label lblCamCount;
+        private TextBox txtCamCardName;     // 카메라 개별설정: 카드 표시 이름(코드 생성, perCam 모드만 표시)
+        private Label lblCamCardName;
+        // chkOcrRemote / chkOcrRemoteNoUpload 는 Designer(gbUpload)에 정의됨
+
+        /// <summary>카드 더블클릭 → 카메라 개별설정 모드로 연다(공통설정의 '반대' 필터 + [SVRCAM{n}] 별도 저장).</summary>
+        public void SetServerCamMode(int camIndex)
+        {
+            _serverCamIndex = camIndex;
+            try { this.Text = string.Format("카메라 {0} 개별 설정 (서버모드)", camIndex + 1); } catch { }
+            // [중요] 실제 개별값/필터 적용은 ApplyServerCamConfig() 에서.
+            //  frmEnv_Load 의 setEnv()(전역값으로 컨트롤 채움)가 이 메서드보다 '나중에' 실행되므로,
+            //  여기서 바로 LoadServerCam 하면 setEnv 가 덮어써 버린다(재실행 시 개별값 사라짐).
+            //  → 폼이 이미 로드됐으면 즉시, 아니면 frmEnv_Load 끝에서 호출.
+            if (IsHandleCreated)
+                ApplyServerCamConfig();
+        }
+
+        /// <summary>서버모드 개별설정 적용 — 반드시 setEnv(전역값 채움) '이후'에 호출해야 개별값이 유지된다.</summary>
+        private void ApplyServerCamConfig()
+        {
+            if (_serverCamIndex < 0) return;
+            ApplyServerModeUi();
+            LoadServerCam(_serverCamIndex);   // 이 카메라의 [SVRCAM{n}] 저장값을 컨트롤에 반영(setEnv 이후라 유지됨)
+            // 카드 표시 이름 입력칸 표시 + 현재 이름 로드(직접 입력)
+            try {
+                string nm = Util.Function.IniReadValue("SVRCAM" + (_serverCamIndex + 1), "name");
+                txtCamCardName.Text = string.IsNullOrEmpty(nm) ? ("카메라" + (_serverCamIndex + 1)) : nm;
+                lblCamCardName.Visible = true; txtCamCardName.Visible = true;
+                lblCamCardName.BringToFront(); txtCamCardName.BringToFront();
+            } catch { }
+            // [중요] 장비번호/채널/입출구(gbLPR LPR1) 필드는 디자이너 기본 Enabled=false + ChkLPRUse1 체크 시에만 활성.
+            //  서버캠은 항상 자기 장비정보가 필요하므로 강제 활성. LoadServerCam 이후에 실행해야 재비활성화 안 됨.
+            try {
+                ChkLPRUse1.Checked = true;
+                SetEnabled(true, ChkLPRUse1, txtLPRNo1, txtEqpmNo1, CmbLPRInOut1, txtLPRName1, CmbLPRType1);
+                if (gbLPR != null) gbLPR.Enabled = true;
+            } catch (Exception ex) { Util.Logger.Log("[서버모드] LPR 장비필드 활성화 오류: " + ex.Message); }
+        }
+
+        /// <summary>서버모드 환경설정 필터.
+        ///  공통모드(_serverCamIndex&lt;0): 공통 항목만 활성.
+        ///  개별모드(_serverCamIndex&gt;=0): 그 '반대'(카메라/차단기/전광판/입출차연동/차단기그룹제한만 활성).</summary>
+        private void ApplyServerModeUi()
+        {
+            try
+            {
+                string rm = Util.Function.IniReadValue("OPTIONK", "servermode") ?? "";
+                bool server = rm.Equals("true", StringComparison.OrdinalIgnoreCase) || rm == "1";
+                bool perCam = _serverCamIndex >= 0;
+                if (!server && !perCam) return;   // 일반 프로그램 모드 → 손대지 않음
+
+                // 카메라설정/차단기설정/전광판설정 탭: 공통=비활성, 개별=활성
+                tabCam.Enabled = perCam;
+                tabGate.Enabled = perCam;
+                tabDisplay.Enabled = perCam;
+
+                // 기본설정 공통항목(DB·동작모드·긴급차량·인식률보정·정기권취득방식·현재주차대수): 공통=활성, 개별=비활성
+                SetEnabled(!perCam, pnlDbInfo, groupBox11, checkEmergencyCar, groupBox10, groupBox29,
+                                    label159, txtStay, btnStayCommit);
+                // 기본설정 비공통(만차/부제/테스트/이미지여부/동일차량/주차장): 두 모드 모두 비활성
+                SetEnabled(false, grpFullControl, chkNoDrivingUse, groupBox27, chkTestMod, gbImage, gbCustomer, gbPark);
+
+                // LPR설정: 인식모듈(groupBox8)·이미지저장(groupBox5)=공통만; 장비설정(gbLPR, 장비번호·입출구)=개별만; 통신/인증=항상 비활성
+                SetEnabled(!perCam, groupBox8, groupBox5);
+                SetEnabled(perCam, gbLPR);
+                SetEnabled(false, gbLPRInfo, gbAuthentication);
+
+                // 입출차 정보 연동(groupBox16): 공통=비활성, 개별=활성
+                groupBox16.Enabled = perCam;
+                // 차단기 그룹 제한: 공통=비활성, 개별=활성
+                SetEnabled(perCam, chkGateGroupUse, chkExitGroupGateUse);
+
+                // 소켓통신·블랙리스트: 공통=활성, 개별=비활성
+                tabSocket.Enabled = !perCam;
+                tabPage4.Enabled = !perCam;
+
+                // --- 개별설정(perCam) 세부: 활성 탭 안에서 추가 비활성 ---
+                if (perCam)
+                {
+                    // 카메라설정: 이미 선택된 카메라 설정이므로 1번/2번 카메라 선택 버튼·USB 메뉴 비활성
+                    SetEnabled(false, btnCam1, btnCam2, usbCamPanel);
+                    // 전광판: 기본 1개(1번 전광판)만 사용 → 2번 전광판(Display2) 컨트롤 전부 비활성(문구2 포함)
+                    DisableByName(tabDisplay, "Display2");
+                    // 입출차 정보 연동: LPR2(groupBox12) 비활성 (LPR1만)
+                    if (groupBox12 != null) groupBox12.Enabled = false;
+                    // 차단기 DIO 출력 PORT: 2번째(Gate2) 비활성 (카메라당 차단기 1개)
+                    DisableByName(tabGate, "Gate2");
+                    // 장비 설정: 기본 1대(LPR1)만 → LPR2(2번 장비) 비활성
+                    SetEnabled(false, txtEqpmNo2, cmbLPRPort2, CmbLPRInOut2, txtLPRProtocol2,
+                               CmbLPRType2, txtLPRName2, txtLPRNo2, ChkLPRUse2);
+                }
+            }
+            catch (Exception ex) { Util.Logger.Log("[서버모드] 환경설정 필터 오류: " + ex.Message); }
+        }
+
+        /// <summary>parent 하위에서 이름에 nameContains 포함된 컨트롤을 모두 비활성(재귀).</summary>
+        private static void DisableByName(System.Windows.Forms.Control parent, string nameContains)
+        {
+            if (parent == null) return;
+            foreach (System.Windows.Forms.Control c in parent.Controls)
+            {
+                if (!string.IsNullOrEmpty(c.Name) && c.Name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0)
+                    c.Enabled = false;
+                if (c.Controls.Count > 0) DisableByName(c, nameContains);
+            }
+        }
+
+        private static void SetEnabled(bool en, params System.Windows.Forms.Control[] cs)
+        {
+            foreach (var c in cs) if (c != null) c.Enabled = en;
+        }
+
+        // 개별설정 대상(카메라/차단기/전광판/입출차연동/차단기그룹제한) 컨트롤 루트.
+        private System.Windows.Forms.Control[] PerCamRoots()
+        {
+            return new System.Windows.Forms.Control[] { tabCam, tabGate, tabDisplay, groupBox16, chkGateGroupUse, chkExitGroupGateUse, gbLPR };
+        }
+
+        /// <summary>카메라 개별설정 저장 — 대상 탭의 모든 입력 컨트롤을 [SVRCAM{n}]에 직렬화(전역 미변경).</summary>
+        private void SaveServerCam(int index)
+        {
+            try
+            {
+                string sec = "SVRCAM" + (index + 1);
+                Util.Function.IniWriteValue(sec, "percam_configured", "true");
+                foreach (System.Windows.Forms.Control r in PerCamRoots()) WalkPerCam(sec, true, r);
+                // 카드 표시 이름(직접 입력) → [SVRCAM{n}].name
+                if (txtCamCardName != null && !string.IsNullOrEmpty(txtCamCardName.Text))
+                    Util.Function.IniWriteValue(sec, "name", txtCamCardName.Text.Trim());
+                // 카드1/2(인덱스0/1)는 기존 cam1/cam2 연결 사용 → 카메라 IP를 [CAMERA]에도 반영(재시작 후 적용)
+                if (txtCamIp != null && !string.IsNullOrEmpty(txtCamIp.Text))
+                {
+                    if (index == 0) Util.Function.IniWriteValue("CAMERA", "cam1ip", txtCamIp.Text.Trim());
+                    else if (index == 1) Util.Function.IniWriteValue("CAMERA", "cam2ip", txtCamIp.Text.Trim());
+                }
+                // 정산 핵심값 저장 확인 로그(장비번호/채널/입출구/게이트포트)
+                Util.Logger.Log(string.Format("[서버모드] 카메라{0} 정산설정 저장 확인 — 장비번호={1} 채널={2} 입출구={3} 게이트포트={4}",
+                    index + 1,
+                    Util.Function.IniReadValue(sec, "pc_txtEqpmNo1"),
+                    Util.Function.IniReadValue(sec, "pc_txtLPRNo1"),
+                    Util.Function.IniReadValue(sec, "pc_CmbLPRInOut1"),
+                    Util.Function.IniReadValue(sec, "pc_CmbGate1Port")));
+                Util.Logger.Log(string.Format("[서버모드] 카메라{0} 개별설정 저장([{1}]) — 전역 미변경", index + 1, sec));
+            }
+            catch (Exception ex) { Util.Logger.Log("[서버모드] 개별설정 저장 오류: " + ex.Message); }
+        }
+
+        /// <summary>[SVRCAM{n}]에 저장된 개별설정 값을 대상 컨트롤에 로드(없으면 전역값 유지).</summary>
+        private void LoadServerCam(int index)
+        {
+            try
+            {
+                string sec = "SVRCAM" + (index + 1);
+                if (!"true".Equals(Util.Function.IniReadValue(sec, "percam_configured"), StringComparison.OrdinalIgnoreCase))
+                    return;   // 아직 개별설정 저장 전 → 전역값 그대로 표시
+                foreach (System.Windows.Forms.Control r in PerCamRoots()) WalkPerCam(sec, false, r);
+            }
+            catch (Exception ex) { Util.Logger.Log("[서버모드] 개별설정 로드 오류: " + ex.Message); }
+        }
+
+        /// <summary>입력 컨트롤(TextBox/ComboBox/CheckBox/RadioButton/NumericUpDown)을 [sec] pc_{Name} 키로
+        /// 저장(save=true)/로드(save=false). 자식까지 재귀.</summary>
+        private void WalkPerCam(string sec, bool save, System.Windows.Forms.Control c)
+        {
+            if (c == null) return;
+            if (!string.IsNullOrEmpty(c.Name))
+            {
+                string key = "pc_" + c.Name;
+                if (c is System.Windows.Forms.TextBox || c is System.Windows.Forms.MaskedTextBox || c is System.Windows.Forms.ComboBox)
+                {
+                    if (save) Util.Function.IniWriteValue(sec, key, c.Text ?? "");
+                    else { string v = Util.Function.IniReadValue(sec, key); if (!string.IsNullOrEmpty(v)) c.Text = v; }
+                }
+                else if (c is System.Windows.Forms.CheckBox)
+                {
+                    System.Windows.Forms.CheckBox cb = (System.Windows.Forms.CheckBox)c;
+                    if (save) Util.Function.IniWriteValue(sec, key, cb.Checked ? "1" : "0");
+                    else { string v = Util.Function.IniReadValue(sec, key); if (v == "1" || v == "0") cb.Checked = (v == "1"); }
+                }
+                else if (c is System.Windows.Forms.RadioButton)
+                {
+                    System.Windows.Forms.RadioButton rb = (System.Windows.Forms.RadioButton)c;
+                    if (save) Util.Function.IniWriteValue(sec, key, rb.Checked ? "1" : "0");
+                    else { string v = Util.Function.IniReadValue(sec, key); if (v == "1") rb.Checked = true; }
+                }
+                else if (c is System.Windows.Forms.NumericUpDown)
+                {
+                    System.Windows.Forms.NumericUpDown nu = (System.Windows.Forms.NumericUpDown)c;
+                    if (save) Util.Function.IniWriteValue(sec, key, nu.Value.ToString());
+                    else
+                    {
+                        decimal d; string v = Util.Function.IniReadValue(sec, key);
+                        if (decimal.TryParse(v, out d) && d >= nu.Minimum && d <= nu.Maximum) nu.Value = d;
+                    }
+                }
+            }
+            foreach (System.Windows.Forms.Control ch in c.Controls) WalkPerCam(sec, save, ch);
         }
 
         private void chkNoDrivingUse_CheckedChanged(object sender, EventArgs e)

@@ -162,23 +162,37 @@ namespace KyungsinLPR
         /// <returns></returns>
         public bool DisconnectStreamPort()
         {
+            // [수정] Close + Dispose로 핸들 즉시 해제 (재연결 반복 시 누수 방지)
             if (m_isUDPStreaming)
             {
                 if (m_sock_SRM_UDP == null) return false;
 
-                var data = Encoding.ASCII.GetBytes("DISCONNECT");
-                m_sock_SRM_UDP.Send(data, data.Length);
-                m_sock_SRM_UDP.Close();
-                m_sock_SRM_UDP = null;
+                try
+                {
+                    var data = Encoding.ASCII.GetBytes("DISCONNECT");
+                    try { m_sock_SRM_UDP.Send(data, data.Length); } catch { }
+                }
+                finally
+                {
+                    try { m_sock_SRM_UDP.Close(); } catch { }
+                    try { ((IDisposable)m_sock_SRM_UDP).Dispose(); } catch { }
+                    m_sock_SRM_UDP = null;
+                }
             }
             else
             {
                 if (m_stream_SRM == null) return false;
 
-                m_stream_SRM.Close();
+                try { m_stream_SRM.Close(); } catch { }
+                try { m_stream_SRM.Dispose(); } catch { }
                 m_stream_SRM = null;
-                m_sock_SRM_TCP.Close();
-                m_sock_SRM_TCP = null;
+
+                if (m_sock_SRM_TCP != null)
+                {
+                    try { m_sock_SRM_TCP.Close(); } catch { }
+                    try { ((IDisposable)m_sock_SRM_TCP).Dispose(); } catch { }
+                    m_sock_SRM_TCP = null;
+                }
             }
             return true;
         }
@@ -234,13 +248,19 @@ namespace KyungsinLPR
         /// <returns></returns>
         public bool DisconnectCommandPort()
         {
+            // [수정] Close + Dispose로 핸들 즉시 해제
             if (m_stream_CMD == null) return false;
 
-            m_stream_CMD.Close();
+            try { m_stream_CMD.Close(); } catch { }
+            try { m_stream_CMD.Dispose(); } catch { }
             m_stream_CMD = null;
+
             if (m_sock_CMD != null)
-                m_sock_CMD.Close();
-            m_sock_CMD = null;
+            {
+                try { m_sock_CMD.Close(); } catch { }
+                try { ((IDisposable)m_sock_CMD).Dispose(); } catch { }
+                m_sock_CMD = null;
+            }
             return true;
         }
 
