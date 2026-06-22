@@ -5611,13 +5611,19 @@ namespace KyungsinLPR
                     roi.h = ENV.CameraEnv.IPCamera1Info.Roi.Top + ENV.CameraEnv.IPCamera1Info.Roi.Height;
                     //dtRegList1.Rows.Add(null, 1, CapCnt + 1, fname, string.Format("{0},{1},{2},{3}", roi.x, roi.y, roi.w, roi.h), "", "", LastLoopTime1, false, 0, IpCam1Current.Generalinfo.Exposure);
                     clsThread.RegArray1[0].CapCnt = 0;
-                    clsThread.RegArray1[0].SourcePath = dlg.FileName;
+                    // [수정] TEST 사진선택도 일반차와 동일한 캡처 파일명 규칙 사용 → 입출차(TCKTTRNS) 저장 사진명을
+                    //        일반차와 동일하게({ChName}_{차번}_{yyyyMMddHHmmss}.jpg) 맞춤. 선택 사진을 작업폴더에
+                    //        {ChName}{yyyyMMddHHmmssffff}0.jpg 로 복사해 일반 캡처처럼 SourcePath 지정.
+                    string _testCap1 = ENV.CameraEnv.IPCamera1Info.ChName + DateTime.Now.ToString("yyyyMMddHHmmssffff") + "0.jpg";
+                    try { File.Copy(dlg.FileName, System.IO.Path.Combine(Directory.GetCurrentDirectory(), _testCap1), true); }
+                    catch (Exception cpErr) { Util.Logger.Log("TEST 사진 복사 실패: " + cpErr.Message); }
+                    clsThread.RegArray1[0].SourcePath = _testCap1;
                     clsThread.RegArray1[0].Roi = string.Format("{0},{1},{2},{3}", roi.x, roi.y, roi.w, roi.h);
                     clsThread.RegArray1[0].PlateRoi = null;
                     clsThread.RegArray1[0].PlateNo = null;
                     clsThread.RegArray1[0].FirstCaptureTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
                     clsThread.RegArray1[0].Send = false;
-                    
+
                     if (File.Exists(dlg.FileName))
                         clsThread.RegArray1[0].Size = new System.IO.FileInfo(dlg.FileName).Length;
                     //RegArray1[CapCnt].term = 0;
@@ -5761,7 +5767,13 @@ namespace KyungsinLPR
                     roi.h = ENV.CameraEnv.IPCamera1Info.Roi.Top + ENV.CameraEnv.IPCamera1Info.Roi.Height;
                     //dtRegList1.Rows.Add(null, 1, CapCnt + 1, fname, string.Format("{0},{1},{2},{3}", roi.x, roi.y, roi.w, roi.h), "", "", LastLoopTime1, false, 0, IpCam1Current.Generalinfo.Exposure);
                     clsThread.RegArray2[0].CapCnt = 0;
-                    clsThread.RegArray2[0].SourcePath = dlg.FileName;
+                    // [수정] TEST 사진선택도 일반차와 동일한 캡처 파일명 규칙 사용 → 입출차(TCKTTRNS) 저장 사진명을
+                    //        일반차와 동일하게({ChName}_{차번}_{yyyyMMddHHmmss}.jpg) 맞춤. cam2는 AfterRegPlateCam(1)
+                    //        에서 IPCamera2Info.ChName 사용하므로 그 ChName으로 작업폴더에 복사.
+                    string _testCap2 = ENV.CameraEnv.IPCamera2Info.ChName + DateTime.Now.ToString("yyyyMMddHHmmssffff") + "0.jpg";
+                    try { File.Copy(dlg.FileName, System.IO.Path.Combine(Directory.GetCurrentDirectory(), _testCap2), true); }
+                    catch (Exception cpErr) { Util.Logger.Log("TEST 사진 복사 실패: " + cpErr.Message); }
+                    clsThread.RegArray2[0].SourcePath = _testCap2;
                     clsThread.RegArray2[0].Roi = string.Format("{0},{1},{2},{3}", roi.x, roi.y, roi.w, roi.h);
                     clsThread.RegArray2[0].PlateRoi = null;
                     clsThread.RegArray2[0].PlateNo = null;
