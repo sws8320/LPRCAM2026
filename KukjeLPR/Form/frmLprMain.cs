@@ -4609,6 +4609,16 @@ namespace KyungsinLPR
                                     case "!live":
                                     case "OK":
                                         packet.Client.ResetLive();
+                                        // [수정] 무인정산기 Live 신호에 회신 — 서버모드는 인식을 ParkingWeb에 위임해
+                                        //        idle 시 LPR이 키오스크 소켓으로 검출 트래픽을 안 보냄 → 무인정산기가
+                                        //        "LPR 무수신" 경고. keepalive에 !live 회신하면 LastReceivedAt 갱신되어 해소.
+                                        //        검출 송신(4228)과 동일 프레이밍. 무인정산기는 !live/OK 회신을 무시 처리.
+                                        try {
+                                            if (ENV.CameraEnv.IPCamera2Info.SendStxEtx)
+                                                LprExitSvr.SendMsgSTXETX("!live");
+                                            else
+                                                LprExitSvr.SendMessage("!live");
+                                        } catch (Exception lex) { Util.Logger.Log("LprExit live 회신 오류: " + lex.Message); }
                                         break;
                                     case "DISPLAY":
                                     case "CANCEL":
@@ -4960,6 +4970,13 @@ namespace KyungsinLPR
                                     case "!live":
                                         packet.Client.ResetLive();
                                         Console.WriteLine(packet.Client.LiveTime);
+                                        // [수정] 무인정산기 Live 신호에 회신 (입차 서버) — 서버모드 idle 무수신 방지.
+                                        try {
+                                            if (ENV.CameraEnv.IPCamera1Info.SendStxEtx)
+                                                LprEntSvr.SendMsgSTXETX("!live");
+                                            else
+                                                LprEntSvr.SendMessage("!live");
+                                        } catch (Exception lex) { Util.Logger.Log("LprEnt live 회신 오류: " + lex.Message); }
                                         break;
                                     case "DISPLAY":
                                     case "CANCEL":
