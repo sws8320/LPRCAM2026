@@ -544,6 +544,10 @@ namespace KyungsinLPR
             else
                 CurrentCnt = ENV.CameraEnv.IPCamera2Info.TriggerCnt;
             while(m_keepGrab2) {
+                // [수정] 카메라 연결 끊김(SocketException/IOException) 시 그랩 스레드가 죽어
+                //        AppDomain.UnhandledException으로 프로세스 전체가 종료되던 문제 방지.
+                //        GrabLoop1과 동일하게 루프 내부를 try/catch로 감싸 예외 시 로깅 후 다음 루프에서 재연결·재시도.
+                try {
                 Bitmap bitmap;
                 MetaInfo metaInfo;
                 IPCamError err = m_camera2.GetImage(1000, out bitmap, out metaInfo);
@@ -728,6 +732,12 @@ namespace KyungsinLPR
 
                 //leess 속도개선 : 이것때문에 반응이 느렸음.
                 //Thread.Sleep(30);
+                } catch(Exception e) {
+                    // 연결 끊김 등으로 프로세스가 죽지 않도록 잡고, 다음 루프에서 위 재연결 로직이 복구.
+                    Util.Logger.Log(string.Format("GrabLoop2 Error {0}", e.Message));
+                    Capture2 = false;
+                    Thread.Sleep(100);
+                }
             }
         }
 
@@ -742,6 +752,8 @@ namespace KyungsinLPR
             else
                 CurrentCnt = ENV.CameraEnv.IPCamera2Info.TriggerCnt;
             while(m_keepGrab2) {
+                // [수정] 연결 끊김 시 그랩 스레드가 죽어 프로세스가 종료되던 문제 방지(GrabLoop1과 동일 패턴).
+                try {
                 Bitmap bitmap;
                 iNova2.MetaInfo metaInfo;
                 iNova2.IPCamError err = m_camera2_inova2.GetImage(1000, out bitmap, out metaInfo);
@@ -892,6 +904,11 @@ namespace KyungsinLPR
                 }
                 //leess 속도개선 : 이것때문에 반응이 느렸음.
                 //Thread.Sleep(30);
+                } catch(Exception e) {
+                    Util.Logger.Log(string.Format("GrabLoop2_iNova2 Error {0}", e.Message));
+                    Capture2 = false;
+                    Thread.Sleep(100);
+                }
             }
         }
 
