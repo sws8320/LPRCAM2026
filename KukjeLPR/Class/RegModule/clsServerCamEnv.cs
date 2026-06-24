@@ -33,6 +33,37 @@ namespace KyungsinLPR
             int camCount = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
             if (camCount < 1 || camCount > 15) camCount = 2;
             for (int i = 2; i < camCount && i < 15; i++) ApplyCam(i);
+            // 카드1·2(인덱스 0,1)는 정산/게이트는 기존 그대로 두되, 네트워크 전광판만 개별설정([SVRCAM1/2])으로 교체.
+            // (서버모드에서는 공통 전광판 탭이 비활성이라, 카드 개별설정이 유일한 전광판 설정 경로)
+            if (ServerMode) { ApplyCardDisplay(0); ApplyCardDisplay(1); }
+        }
+
+        /// <summary>서버모드에서 카드1·2(인덱스 0,1)의 네트워크 전광판을 개별설정([SVRCAM{n}])으로 덮어쓴다.
+        /// cam0/1 은 기존 DataProcess 전광판 경로(NetDisPlay1/2)를 그대로 사용하되 IP/포트/사용여부만 개별값으로 교체.
+        /// 게이트/인식/정산은 건드리지 않음(전광판 한정). 개별 네트워크 전광판 미설정이면 전역값 유지.
+        /// Load()(clsServerCamEnv) 가 NetDisPlay1/2 초기화보다 먼저 실행되므로, 여기서 주입하면 초기화가 개별 IP 를 사용한다.</summary>
+        public static void ApplyCardDisplay(int idx)
+        {
+            if (idx != 0 && idx != 1) return;
+            try
+            {
+                var dispArr = frmLprMain.ENV.CommunicationEnv.DisPlay;
+                if (dispArr == null || idx >= dispArr.Length) return;
+                string sec = "SVRCAM" + (idx + 1);
+                if (Pc(sec, "pc_chkDisplay1NetUse") != "1") return;   // 개별 네트워크 전광판 미설정 → 전역값 유지
+                string ip = Pc(sec, "pc_txtDisplay1NetIp");
+                if (string.IsNullOrEmpty(ip)) return;
+
+                ClsStructure.DisPlay_Info disp = dispArr[idx];
+                disp.Use = true;        // DataProcess 전광판 경로 활성(전광판 한정)
+                disp.UseFiex = true;    // 인식 시 차번 송출 경로 활성
+                disp.Net.Use = true;
+                disp.Net.IP = ip;
+                int dport; disp.Net.Port = int.TryParse(Pc(sec, "pc_txtDisplay1NetPort"), out dport) ? dport : 5000;
+                frmLprMain.ENV.CommunicationEnv.DisPlay[idx] = disp;
+                Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 개별적용 {1}:{2}", idx + 1, disp.Net.IP, disp.Net.Port));
+            }
+            catch (Exception ex) { Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 적용 오류: {1}", idx + 1, ex.Message)); }
         }
 
         /// <summary>카메라(idx) 한 대의 [SVRCAM{n}] 설정을 현재 ENV 에 주입 + Lpr 캐시. 멱등·널안전.</summary>
