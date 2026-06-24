@@ -2576,6 +2576,27 @@ namespace KyungsinLPR
             btnDisplay2TestPeriod.Enabled = chk;
         }
 
+        // 전광판 'Test' 버튼 전용 송신기 — 화면에 입력된 IP:Port 로 직접 연결/송신(개별설정·서버모드에서도 그 카메라 보드를 정확히 테스트)
+        private NetworkDisplay _testDisp;
+        private string _testDispKey = "";
+        /// <summary>화면 입력 IP:Port 로 테스트 문구 송신. 같은 대상이면 연결 재사용, 바뀌면 재연결(비동기 연결이라 첫 회 짧게 대기).</summary>
+        private void SendDisplayTest(string ip, string portText, string line1, int color1, string line2, int color2)
+        {
+            if (string.IsNullOrWhiteSpace(ip)) { MessageBox.Show("전광판 IP를 입력하세요."); return; }
+            int port; if (!int.TryParse((portText ?? "").Trim(), out port) || port <= 0) port = 5000;
+            string key = ip.Trim() + ":" + port;
+            if (_testDisp == null || _testDispKey != key)
+            {
+                try { if (_testDisp != null) _testDisp.SocketClose(); } catch { }
+                _testDisp = new NetworkDisplay();
+                _testDisp.Tag = "전광판테스트";
+                _testDisp.Init(ip.Trim(), port, "TCP");
+                _testDispKey = key;
+                System.Threading.Thread.Sleep(300);   // 비동기 TCP 연결 대기(첫 송신 누락 방지)
+            }
+            _testDisp.SendMsg(line1, color1, line2, color2);
+        }
+
         private void btnDisplay1TestNormal_Click(object sender, EventArgs e)
         {
             Button btn = (Button)sender;
@@ -2584,9 +2605,9 @@ namespace KyungsinLPR
                 switch (btn.Name)
                 {
                     case "btnDisplay1Test":
-                        if (frmLprMain.NetDisPlay1 != null && env.CommunicationEnv.DisPlay[0].Net.Use)
+                        if (chkDisplay1NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay1.SendMsg(txtDisplay1Text1.Text, (byte)clsFunction.GetColor8Int(CmbDisplayText1Color1.Text), txtDisplay1Text2.Text, (byte)clsFunction.GetColor8Int(CmbDisplayText1Color2.Text));
+                            SendDisplayTest(txtDisplay1NetIp.Text, txtDisplay1NetPort.Text, txtDisplay1Text1.Text, clsFunction.GetColor8Int(CmbDisplayText1Color1.Text), txtDisplay1Text2.Text, clsFunction.GetColor8Int(CmbDisplayText1Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.FirstDisPlay3.WriteDisPlay(txtDisplay1Text1.Text, txtDisplay1Text2.Text, clsFunction.GetColor3Int(CmbDisplayText1Color1.Text), clsFunction.GetColor3Int(CmbDisplayText1Color2.Text));
@@ -2596,9 +2617,9 @@ namespace KyungsinLPR
                             SerialDev.FirstDisPlayAmano3.SendDisplay(txtDisplay1Text1.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayText1Color1.Text), txtDisplay1Text2.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayText1Color2.Text));
                         break;
                     case "btnDisplay1TestNormal":
-                        if (frmLprMain.NetDisPlay1 != null && env.CommunicationEnv.DisPlay[0].Net.Use)
+                        if (chkDisplay1NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay1.SendMsg(txtNormalCar1.Text, (byte)clsFunction.GetColor8Int(CmbDisplayTextNormal1Color1.Text), "테스트", (byte)clsFunction.GetColor8Int(CmbDisplayTextNormal1Color2.Text));
+                            SendDisplayTest(txtDisplay1NetIp.Text, txtDisplay1NetPort.Text, txtNormalCar1.Text, clsFunction.GetColor8Int(CmbDisplayTextNormal1Color1.Text), "테스트", clsFunction.GetColor8Int(CmbDisplayTextNormal1Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.FirstDisPlay3.WriteDisPlay(txtNormalCar1.Text, "테스트", clsFunction.GetColor3Int(CmbDisplayTextNormal1Color1.Text), clsFunction.GetColor3Int(CmbDisplayTextNormal1Color2.Text));
@@ -2608,9 +2629,9 @@ namespace KyungsinLPR
                             SerialDev.FirstDisPlayAmano3.SendDisplay(txtNormalCar1.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayTextNormal1Color1.Text), "테스트", clsFunction.GetAmanoColor3uInt(CmbDisplayTextNormal1Color2.Text));
                         break;
                     case "btnDisplay1TestPeriod":
-                        if (frmLprMain.NetDisPlay1 != null && env.CommunicationEnv.DisPlay[0].Net.Use)
+                        if (chkDisplay1NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay1.SendMsg(txtPeriodCar1.Text, (byte)clsFunction.GetColor8Int(CmbDisplayTextPeriod1Color1.Text), "테스트", (byte)clsFunction.GetColor8Int(CmbDisplayTextPeriod1Color2.Text));
+                            SendDisplayTest(txtDisplay1NetIp.Text, txtDisplay1NetPort.Text, txtPeriodCar1.Text, clsFunction.GetColor8Int(CmbDisplayTextPeriod1Color1.Text), "테스트", clsFunction.GetColor8Int(CmbDisplayTextPeriod1Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[0].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.FirstDisPlay3.WriteDisPlay(txtPeriodCar1.Text, "테스트", clsFunction.GetColor3Int(CmbDisplayTextPeriod1Color1.Text), clsFunction.GetColor3Int(CmbDisplayTextPeriod1Color2.Text));
@@ -2620,9 +2641,9 @@ namespace KyungsinLPR
                             SerialDev.FirstDisPlayAmano3.SendDisplay(txtPeriodCar1.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayTextPeriod1Color1.Text), "테스트", clsFunction.GetAmanoColor3uInt(CmbDisplayTextPeriod1Color2.Text));
                         break;
                     case "btnDisplay2Test":
-                        if (frmLprMain.NetDisPlay2 != null && env.CommunicationEnv.DisPlay[1].Net.Use)
+                        if (chkDisplay2NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay2.SendMsg(txtDisplay2Text1.Text, (byte)clsFunction.GetColor8Int(CmbDisplayText2Color1.Text), txtDisplay2Text2.Text, (byte)clsFunction.GetColor8Int(CmbDisplayText2Color2.Text));
+                            SendDisplayTest(txtDisplay2NetIp.Text, txtDisplay2NetPort.Text, txtDisplay2Text1.Text, clsFunction.GetColor8Int(CmbDisplayText2Color1.Text), txtDisplay2Text2.Text, clsFunction.GetColor8Int(CmbDisplayText2Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[1].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.SecondDisPlay3.WriteDisPlay(txtDisplay2Text1.Text, txtDisplay2Text2.Text, clsFunction.GetColor3Int(CmbDisplayText2Color1.Text), clsFunction.GetColor3Int(CmbDisplayText2Color2.Text));
@@ -2632,9 +2653,9 @@ namespace KyungsinLPR
                             SerialDev.SecondDisPlayAmano3.SendDisplay(txtDisplay2Text1.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayText2Color1.Text), txtDisplay2Text2.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayText2Color2.Text));
                         break;
                     case "btnDisplay2TestNormal":
-                        if (frmLprMain.NetDisPlay2 != null && env.CommunicationEnv.DisPlay[1].Net.Use)
+                        if (chkDisplay2NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay2.SendMsg(txtNormalCar2.Text, (byte)clsFunction.GetColor8Int(CmbDisplayTextNormal2Color1.Text), "테스트", (byte)clsFunction.GetColor8Int(CmbDisplayTextNormal2Color2.Text));
+                            SendDisplayTest(txtDisplay2NetIp.Text, txtDisplay2NetPort.Text, txtNormalCar2.Text, clsFunction.GetColor8Int(CmbDisplayTextNormal2Color1.Text), "테스트", clsFunction.GetColor8Int(CmbDisplayTextNormal2Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[1].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.SecondDisPlay3.WriteDisPlay(txtNormalCar2.Text, "테스트", clsFunction.GetColor3Int(CmbDisplayTextNormal2Color1.Text), clsFunction.GetColor3Int(CmbDisplayTextNormal2Color2.Text));
@@ -2644,9 +2665,9 @@ namespace KyungsinLPR
                             SerialDev.SecondDisPlayAmano3.SendDisplay(txtNormalCar2.Text, clsFunction.GetAmanoColor3uInt(CmbDisplayTextNormal2Color1.Text), "테스트", clsFunction.GetAmanoColor3uInt(CmbDisplayTextNormal2Color2.Text));
                         break;
                     case "btnDisplay2TestPeriod":
-                        if (frmLprMain.NetDisPlay2 != null && env.CommunicationEnv.DisPlay[1].Net.Use)
+                        if (chkDisplay2NetUse.Checked)
                         {
-                            frmLprMain.NetDisPlay2.SendMsg(txtPeriodCar2.Text, (byte)clsFunction.GetColor8Int(CmbDisplayTextPeriod2Color1.Text), "테스트", (byte)clsFunction.GetColor8Int(CmbDisplayTextPeriod2Color2.Text));
+                            SendDisplayTest(txtDisplay2NetIp.Text, txtDisplay2NetPort.Text, txtPeriodCar2.Text, clsFunction.GetColor8Int(CmbDisplayTextPeriod2Color1.Text), "테스트", clsFunction.GetColor8Int(CmbDisplayTextPeriod2Color2.Text));
                         }
                         else if (env.CommunicationEnv.DisPlay[1].Com.Dev_Type_Name.Equals(ClsStructure.DisPlayType.Color3.ToString()))
                             SerialDev.SecondDisPlay3.WriteDisPlay(txtPeriodCar2.Text, "테스트", clsFunction.GetColor3Int(CmbDisplayTextPeriod2Color1.Text), clsFunction.GetColor3Int(CmbDisplayTextPeriod2Color2.Text));
