@@ -19,6 +19,8 @@ namespace KyungsinLPR
         public DateTime SendTime = new DateTime();
         public DateTime RecvTime = new DateTime();
         public bool Entrance_Type;
+        public string Tag = "";              // 전광판 식별(카드1/카드2/카드3...) — 송신 로그용
+        private string _lastLogSig = null;   // 직전 송신내용(중복 로그 억제: 매초 환영문구 재전송 스팸 방지)
 
         public delegate void SendDelegate(); //델리게이트 선언
         public event SendDelegate SendDel; //델리게이트 이벤트 선언
@@ -186,6 +188,18 @@ namespace KyungsinLPR
 
         public void SendMsg(string Ment1, int Color1, string Ment2, int Color2)
         {
+            // 어느 카드가 어느 보드에 무엇을 보내는지 기록. 내용 동일하면 생략(매초 환영문구 재전송 스팸 방지).
+            try
+            {
+                string sig = Ment1 + "|" + Ment2 + "|" + Color1 + "|" + Color2;
+                if (sig != _lastLogSig)
+                {
+                    _lastLogSig = sig;
+                    Util.Logger.Log(string.Format("[전광판송신] {0} {1}:{2}  1열='{3}'(색{4}) 2열='{5}'(색{6})",
+                        string.IsNullOrEmpty(Tag) ? "?" : Tag, Ip, Port, Ment1, Color1, Ment2, Color2));
+                }
+            }
+            catch { }
             SendDisplay(Ment1, Ment2, Color1, Color2);
             currentMent1 = Ment1;
             currentMent2 = Ment2;
