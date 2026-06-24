@@ -3048,11 +3048,15 @@ namespace KyungsinLPR
             try
             {
                 string sec = "SVRCAM" + (index + 1);
-                Util.Function.IniWriteValue(sec, "percam_configured", "true");
-                foreach (System.Windows.Forms.Control r in PerCamRoots()) WalkPerCam(sec, true, r);
+                // 저장 가속: 컨트롤마다 IniWriteValue(키 1개당 39KB INI 전체 재파싱·디스크 플러시 = 203키면 수 초)
+                //  대신, 값들을 모아 [SVRCAM{n}] 섹션을 1회 읽기 + 1회 쓰기로 배치 저장.
+                var pcDict = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                pcDict["percam_configured"] = "true";
+                foreach (System.Windows.Forms.Control r in PerCamRoots()) WalkPerCamCollect(pcDict, r);
                 // 카드 표시 이름(직접 입력) → [SVRCAM{n}].name
                 if (txtCamCardName != null && !string.IsNullOrEmpty(txtCamCardName.Text))
-                    Util.Function.IniWriteValue(sec, "name", txtCamCardName.Text.Trim());
+                    pcDict["name"] = txtCamCardName.Text.Trim();
+                IniWriteSectionBatch(sec, pcDict);
                 // 카드1/2(인덱스0/1)는 기존 cam1/cam2 연결 사용 → 카메라 IP를 [CAMERA]에도 반영(재시작 후 적용)
                 if (txtCamIp != null && !string.IsNullOrEmpty(txtCamIp.Text))
                 {
@@ -3121,6 +3125,91 @@ namespace KyungsinLPR
                 }
             }
             foreach (System.Windows.Forms.Control ch in c.Controls) WalkPerCam(sec, save, ch);
+        }
+
+        /// <summary>WalkPerCam 저장과 동일 규칙으로 키/값을 dict 에 모은다(파일은 안 씀 → 배치 저장용).</summary>
+        private void WalkPerCamCollect(System.Collections.Generic.Dictionary<string, string> dict, System.Windows.Forms.Control c)
+        {
+            if (c == null) return;
+            if (!string.IsNullOrEmpty(c.Name))
+            {
+                string key = "pc_" + c.Name;
+                if (c is System.Windows.Forms.TextBox || c is System.Windows.Forms.MaskedTextBox || c is System.Windows.Forms.ComboBox)
+                    dict[key] = c.Text ?? "";
+                else if (c is System.Windows.Forms.CheckBox)
+                    dict[key] = ((System.Windows.Forms.CheckBox)c).Checked ? "1" : "0";
+                else if (c is System.Windows.Forms.RadioButton)
+                    dict[key] = ((System.Windows.Forms.RadioButton)c).Checked ? "1" : "0";
+                else if (c is System.Windows.Forms.NumericUpDown)
+                    dict[key] = ((System.Windows.Forms.NumericUpDown)c).Value.ToString();
+            }
+            foreach (System.Windows.Forms.Control ch in c.Controls) WalkPerCamCollect(dict, ch);
+        }
+
+        /// <summary>한 섹션의 여러 키를 INI 전체 1회 읽기 + 1회 쓰기로 저장(WritePrivateProfileString 키당 재기록 회피).
+        /// 인코딩은 WritePrivateProfileString 와 동일한 시스템 ANSI(CP949)로 맞춰 한글 보존. 기존 키는 제자리 갱신, 신규는 섹션 끝 추가.</summary>
+        private void IniWriteSectionBatch(string sec, System.Collections.Generic.Dictionary<string, string> kv)
+        {
+            try
+            {
+                string path = Util.Function.IniFileName;   // DLL(WritePrivateProfileString)이 쓰는 실제 INI 경로
+                System.Text.Encoding enc = System.Text.Encoding.Default;   // = WritePrivateProfileString 의 ANSI(CP949)
+                var lines = System.IO.File.Exists(path)
+                    ? new System.Collections.Generic.List<string>(System.IO.File.ReadAllLines(path, enc))
+                    : new System.Collections.Generic.List<string>();
+
+                // 섹션 [sec] 범위 찾기
+                int secStart = -1, secEnd = lines.Count;
+                for (int i = 0; i < lines.Count; i++)
+                {
+                    string t = lines[i].Trim();
+                    if (t.StartsWith("[") && t.EndsWith("]"))
+                    {
+                        string name = t.Substring(1, t.Length - 2).Trim();
+                        if (secStart < 0)
+                        {
+                            if (name.Equals(sec, StringComparison.OrdinalIgnoreCase)) secStart = i;
+                        }
+                        else { secEnd = i; break; }
+                    }
+                }
+
+                var remaining = new System.Collections.Generic.Dictionary<string, string>(kv, StringComparer.OrdinalIgnoreCase);
+
+                if (secStart < 0)
+                {
+                    // 섹션 없음 → 파일 끝에 새로 추가
+                    if (lines.Count > 0 && lines[lines.Count - 1].Trim().Length != 0) lines.Add("");
+                    lines.Add("[" + sec + "]");
+                    foreach (var p in kv) lines.Add(p.Key + "=" + p.Value);
+                }
+                else
+                {
+                    // 기존 키 제자리 갱신
+                    for (int i = secStart + 1; i < secEnd; i++)
+                    {
+                        int eq = lines[i].IndexOf('=');
+                        if (eq <= 0) continue;
+                        string k = lines[i].Substring(0, eq).Trim();
+                        string val;
+                        if (remaining.TryGetValue(k, out val)) { lines[i] = k + "=" + val; remaining.Remove(k); }
+                    }
+                    // 신규 키는 섹션 끝(secEnd 직전)에 삽입
+                    if (remaining.Count > 0)
+                    {
+                        var toAdd = new System.Collections.Generic.List<string>();
+                        foreach (var p in remaining) toAdd.Add(p.Key + "=" + p.Value);
+                        lines.InsertRange(secEnd, toAdd);
+                    }
+                }
+                System.IO.File.WriteAllLines(path, lines, enc);
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Log("[서버모드] 섹션 배치저장 오류(개별저장 폴백): " + ex.Message);
+                // 폴백: 실패 시 기존 방식으로라도 저장
+                foreach (var p in kv) Util.Function.IniWriteValue(sec, p.Key, p.Value);
+            }
         }
 
         private void chkNoDrivingUse_CheckedChanged(object sender, EventArgs e)
