@@ -2579,11 +2579,25 @@ namespace KyungsinLPR
         // 전광판 'Test' 버튼 전용 송신기 — 화면에 입력된 IP:Port 로 직접 연결/송신(개별설정·서버모드에서도 그 카메라 보드를 정확히 테스트)
         private NetworkDisplay _testDisp;
         private string _testDispKey = "";
-        /// <summary>화면 입력 IP:Port 로 테스트 문구 송신. 같은 대상이면 연결 재사용, 바뀌면 재연결(비동기 연결이라 첫 회 짧게 대기).</summary>
+        /// <summary>화면 입력 IP:Port 로 테스트 문구 송신.
+        /// 같은 보드에 런타임 전광판(welcome 루프)이 이미 연결돼 있으면 그 인스턴스를 재사용한다.
+        /// (별도 2번째 소켓으로 같은 보드에 동시 송신하면 welcome 루프와 바이트가 섞여 '깨짐' 발생)
+        /// 런타임 연결이 없거나 IP가 다르면 임시 테스트 연결로 송신.</summary>
         private void SendDisplayTest(string ip, string portText, string line1, int color1, string line2, int color2)
         {
             if (string.IsNullOrWhiteSpace(ip)) { MessageBox.Show("전광판 IP를 입력하세요."); return; }
             int port; if (!int.TryParse((portText ?? "").Trim(), out port) || port <= 0) port = 5000;
+
+            // 1) 같은 보드를 쓰는 런타임 전광판이 있으면 그 단일 소켓 재사용(+welcome 루프 비켜서게 DisPlayTime 갱신)
+            NetworkDisplay rt = GetRuntimeDisplayForTest(ip.Trim(), port);
+            if (rt != null)
+            {
+                rt.DisPlayTime = DateTime.Now;   // welcome 루프가 Term 초 동안 비켜서도록(충돌 방지)
+                rt.SendMsg(line1, color1, line2, color2);
+                return;
+            }
+
+            // 2) 런타임 연결 없음/IP 다름 → 임시 테스트 연결(같은 대상이면 재사용)
             string key = ip.Trim() + ":" + port;
             if (_testDisp == null || _testDispKey != key)
             {
@@ -2595,6 +2609,21 @@ namespace KyungsinLPR
                 System.Threading.Thread.Sleep(300);   // 비동기 TCP 연결 대기(첫 송신 누락 방지)
             }
             _testDisp.SendMsg(line1, color1, line2, color2);
+        }
+
+        /// <summary>개별설정 중인 카메라(_serverCamIndex)의 런타임 전광판 인스턴스 — IP:Port 가 화면값과 같을 때만 반환(아니면 null).</summary>
+        private NetworkDisplay GetRuntimeDisplayForTest(string ip, int port)
+        {
+            try
+            {
+                NetworkDisplay nd = null;
+                if (_serverCamIndex == 0) nd = frmLprMain.NetDisPlay1;
+                else if (_serverCamIndex == 1) nd = frmLprMain.NetDisPlay2;
+                else if (_serverCamIndex >= 2) nd = frmLprMain.NetDevForServer(_serverCamIndex);
+                if (nd != null && ip.Equals((nd.Ip ?? "").Trim()) && port == nd.Port) return nd;
+            }
+            catch { }
+            return null;
         }
 
         private void btnDisplay1TestNormal_Click(object sender, EventArgs e)
