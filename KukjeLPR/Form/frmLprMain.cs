@@ -1197,6 +1197,21 @@ namespace KyungsinLPR
         // 서버캠(idx>=2) 네트워크 전광판 인스턴스 캐시
         private static readonly System.Collections.Generic.Dictionary<int, NetworkDisplay> _svrNetDisp = new System.Collections.Generic.Dictionary<int, NetworkDisplay>();
 
+        /// <summary>서버캠(3~15) 네트워크 전광판을 시작 시 미리 생성·연결(welcome 루프 시작). 카메라1·2(NetDisPlay1/2)와 동일하게
+        /// 시작 시 연결해 두어, 첫 인식 때 지연 연결로 첫 송신이 누락되는 문제를 막는다. Net 미설정 카메라는 건너뜀(null).</summary>
+        private void InitServerCamDisplays() {
+            try {
+                if(!clsServerCamEnv.ServerMode) return;
+                int camCount = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
+                if(camCount < 1 || camCount > 15) camCount = 2;
+                for(int i = 2; i < camCount && i < 15; i++) {
+                    clsServerCamEnv.ApplyCam(i);                 // DisPlay[i].Net 주입 보장(혹시 Load 후 ENV 재대입 대비)
+                    NetworkDisplay nd = NetDevForServer(i);      // Net.Use 면 생성+연결+welcome 루프
+                    Util.Logger.Log(string.Format("[서버캠{0}] 전광판 시작연결 {1}", i + 1, nd != null ? "완료" : "미설정/건너뜀"));
+                }
+            } catch(Exception ex) { Util.Logger.Log("[서버캠] 전광판 시작연결 오류: " + ex.Message); }
+        }
+
         /// <summary>서버캠(idx>=2)의 네트워크 전광판 인스턴스(없으면 생성·캐시·환영문구 루프 시작). Net 미설정이면 null.</summary>
         public static NetworkDisplay NetDevForServer(int camIdx) {
             try {
@@ -1319,6 +1334,7 @@ namespace KyungsinLPR
                 }
                 ENV = func.GetEnv(ENV);
                 clsServerCamEnv.Load();   // 서버모드 카메라 2~14 정산설정([SVRCAM] 장비/게이트) → ENV 주입(ENV 로드 직후)
+                InitServerCamDisplays();  // 서버캠(3~15) 네트워크 전광판 시작 시 선연결(카메라1·2와 동일) — 첫 송신 누락 방지
 
                 BeforeCalOpt.Load();
                 clsOutService.Load();
