@@ -50,11 +50,18 @@ namespace KyungsinLPR
                 var dispArr = frmLprMain.ENV.CommunicationEnv.DisPlay;
                 if (dispArr == null || idx >= dispArr.Length) return;
                 string sec = "SVRCAM" + (idx + 1);
-                if (Pc(sec, "pc_chkDisplay1NetUse") != "1") return;   // 개별 네트워크 전광판 미설정 → 전역값 유지
                 string ip = Pc(sec, "pc_txtDisplay1NetIp");
-                if (string.IsNullOrEmpty(ip)) return;
-
+                bool netUse = Pc(sec, "pc_chkDisplay1NetUse") == "1" && !string.IsNullOrEmpty(ip);
                 ClsStructure.DisPlay_Info disp = dispArr[idx];
+                if (!netUse)
+                {
+                    // 서버모드는 카메라별 개별설정이 곧 전부. 개별 네트워크 전광판이 꺼져 있으면
+                    // 전역 [전광판] 값(예: 192.168.1.115)으로 송신하지 않도록 이 카메라 전광판을 끈다.
+                    disp.Use = false; disp.Net.Use = false;
+                    frmLprMain.ENV.CommunicationEnv.DisPlay[idx] = disp;
+                    Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 미사용 — 전역값({1}) 무시, 전송 안 함", idx + 1, disp.Net.IP));
+                    return;
+                }
                 // 네트워크 전광판 활성(전광판 한정) — DataProcess 전광판 경로(NetDisPlay1/2)가 이 IP/문구를 사용
                 disp.Use = true;        // DataProcess 전광판 경로 활성
                 disp.UseFiex = true;    // 인식 시 차번 송출 경로 활성
