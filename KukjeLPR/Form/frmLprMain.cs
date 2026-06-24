@@ -1207,7 +1207,7 @@ namespace KyungsinLPR
                     ClsStructure.DisPlay_Info disp = ENV.CommunicationEnv.DisPlay[camIdx];
                     if(!disp.Net.Use || string.IsNullOrEmpty(disp.Net.IP)) return null;
                     nd = new NetworkDisplay();
-                    nd.Tag = "카드" + (camIdx + 1);
+                    nd.Tag = "카메라" + (camIdx + 1);
                     nd.Init(disp.Net.IP, disp.Net.Port, "TCP");
                     nd.DisPlayTime = DateTime.Now.AddSeconds(-10);
                     nd.Color1 = clsFunction.GetColor8Int(disp.Ment.Ment1Color);
@@ -1345,7 +1345,7 @@ namespace KyungsinLPR
                             if(ENV.CameraEnv.CoreCountry == CoreLogic.THA)
                                 NetDisPlay1.CharCode = 0x01;
                             NetDisPlay1 = new NetworkDisplay();
-                            NetDisPlay1.Tag = "카드1";
+                            NetDisPlay1.Tag = "카메라1";
                             NetDisPlay1.Init(ENV.CommunicationEnv.DisPlay[0].Net.IP, ENV.CommunicationEnv.DisPlay[0].Net.Port, "TCP");
                             NetDisPlay1.DisPlayTime = DateTime.Now.AddSeconds(-10);
                             NetDisPlay1.Color1 = clsFunction.GetColor8Int(ENV.CommunicationEnv.DisPlay[0].Ment.Ment1Color);
@@ -1421,7 +1421,7 @@ namespace KyungsinLPR
                             if(ENV.CameraEnv.CoreCountry == CoreLogic.THA)
                                 NetDisPlay2.CharCode = 0x01;
                             NetDisPlay2 = new NetworkDisplay();
-                            NetDisPlay2.Tag = "카드2";
+                            NetDisPlay2.Tag = "카메라2";
                             NetDisPlay2.Init(ENV.CommunicationEnv.DisPlay[1].Net.IP, ENV.CommunicationEnv.DisPlay[1].Net.Port, "TCP");
                             NetDisPlay2.DisPlayTime = DateTime.Now.AddSeconds(-10);
                             NetDisPlay2.Color1 = clsFunction.GetColor8Int(ENV.CommunicationEnv.DisPlay[1].Ment.Ment1Color);
