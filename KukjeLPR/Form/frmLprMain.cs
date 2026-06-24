@@ -1239,6 +1239,15 @@ namespace KyungsinLPR
             } catch(Exception ex) { Util.Logger.Log("[서버캠] 전광판 생성오류: " + ex.Message); return null; }
         }
 
+        /// <summary>전광판 2열 차번 우측정렬 — 카메라1·2 의 CarNoSpace 와 동일(12바이트 폭, 좌측 공백 패딩).
+        /// 한글은 CP949 2바이트로 계산(KOR). 서버캠도 카메라1·2 처럼 우측정렬되도록.</summary>
+        private static string PlateRightAlign(string carno) {
+            if(string.IsNullOrEmpty(carno)) return carno;
+            int len;
+            try { len = System.Text.Encoding.Default.GetByteCount(carno); } catch { len = carno.Length; }
+            return (len < 12 ? new string(' ', 12 - len) : "") + carno;
+        }
+
         /// <summary>서버캠 인식결과를 네트워크 전광판에 출력(정기/일반). 미인식은 환영문구 유지(미송신).</summary>
         private void ServerCamDisplay(int camIdx, string plate, bool reged) {
             try {
@@ -1251,7 +1260,7 @@ namespace KyungsinLPR
                 string line1, color1, color2;
                 if(reged) { line1 = string.IsNullOrEmpty(disp.PeriodCar) ? "정기차량" : disp.PeriodCar; color1 = disp.Period1Color; color2 = disp.Period2Color; }
                 else      { line1 = string.IsNullOrEmpty(disp.NormalCar) ? "일반차량" : disp.NormalCar; color1 = disp.Normal1Color; color2 = disp.Normal2Color; }
-                nd.SendMsg(line1, clsFunction.GetColor8Int(color1), plate, clsFunction.GetColor8Int(color2));
+                nd.SendMsg(line1, clsFunction.GetColor8Int(color1), PlateRightAlign(plate), clsFunction.GetColor8Int(color2));
                 nd.DisPlayTime = DateTime.Now;   // 차량 문구 Term 초 유지 후 환영문구 자동 복귀
                 Util.Logger.Log(string.Format("[서버캠{0}] 전광판 출력 '{1}' '{2}'", camIdx + 1, line1, plate));
             } catch(Exception ex) { Util.Logger.Log("[서버캠] 전광판 출력오류: " + ex.Message); }
