@@ -55,13 +55,27 @@ namespace KyungsinLPR
                 if (string.IsNullOrEmpty(ip)) return;
 
                 ClsStructure.DisPlay_Info disp = dispArr[idx];
-                disp.Use = true;        // DataProcess 전광판 경로 활성(전광판 한정)
+                // 네트워크 전광판 활성(전광판 한정) — DataProcess 전광판 경로(NetDisPlay1/2)가 이 IP/문구를 사용
+                disp.Use = true;        // DataProcess 전광판 경로 활성
                 disp.UseFiex = true;    // 인식 시 차번 송출 경로 활성
                 disp.Net.Use = true;
                 disp.Net.IP = ip;
                 int dport; disp.Net.Port = int.TryParse(Pc(sec, "pc_txtDisplay1NetPort"), out dport) ? dport : 5000;
+                // 문구/색상도 개별설정([SVRCAM]) 값으로 교체 — 전역값 무시. (환영문구/일반/정기 모두 개별 적용)
+                disp.Com.Dev_Type_Name = PcOr(sec, "pc_CmbDisplay1Type", "Color8");
+                disp.Ment.Ment1Line  = Pc(sec, "pc_txtDisplay1Text1");                       // 환영문구 1열 (예: 안녕)
+                disp.Ment.Ment1Color = PcOr(sec, "pc_CmbDisplayText1Color1", "녹색");
+                disp.Ment.Ment2Line  = Pc(sec, "pc_txtDisplay1Text2");                       // 환영문구 2열 (예: 어서)
+                disp.Ment.Ment2Color = PcOr(sec, "pc_CmbDisplayText1Color2", "백색");
+                disp.NormalCar    = PcOr(sec, "pc_txtNormalCar1", "일반차량");
+                disp.Normal1Color = PcOr(sec, "pc_CmbDisplayTextNormal1Color1", "녹색");
+                disp.Normal2Color = PcOr(sec, "pc_CmbDisplayTextNormal1Color2", "청록");
+                disp.PeriodCar    = PcOr(sec, "pc_txtPeriodCar1", "정기차량");
+                disp.Period1Color = PcOr(sec, "pc_CmbDisplayTextPeriod1Color1", "백색");
+                disp.Period2Color = PcOr(sec, "pc_CmbDisplayTextPeriod1Color2", "분홍");
                 frmLprMain.ENV.CommunicationEnv.DisPlay[idx] = disp;
-                Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 개별적용 {1}:{2}", idx + 1, disp.Net.IP, disp.Net.Port));
+                Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 개별적용 {1}:{2} 환영='{3}/{4}' 일반='{5}' 정기='{6}'",
+                    idx + 1, disp.Net.IP, disp.Net.Port, disp.Ment.Ment1Line, disp.Ment.Ment2Line, disp.NormalCar, disp.PeriodCar));
             }
             catch (Exception ex) { Util.Logger.Log(string.Format("[ServerCamEnv{0}] 카드 전광판 적용 오류: {1}", idx + 1, ex.Message)); }
         }
