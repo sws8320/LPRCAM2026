@@ -748,35 +748,34 @@ namespace KyungsinLPR {
 
                 Evo.Func.FreeObj(ref ctxDDI);
                 // [-]
-                // 2. Allocate a new snapshot engine.
-                for(int i = 0; i < 2; i++) {
-                    //leess 6.x 모듈변경
-                    //handSSE[i] = Evo.SSEngine.Allocate();
-                    handSSE[i] = Evo.SSEngine.Create();
-                    if(handSSE[i] < 0) {
-                        var lastRc = Evo.Func.GetLastRC();
-                        Console.WriteLine("SnapshotEngine.Create() failed. : {0}", lastRc);
-                        ShowEvoEngineError("SSEngine.Create() 실패. 반환 코드: " + lastRc, null);
-                        return false;
-                    }
-
-                    // 3. Initialize the engine.
-                    // ddd 형식: "normal(accuracy):GPU,CPU" (CoreLogic 박선임 안내).
-                    // null이면 SDK 기본 = CPU (변경 전과 동일).
-                    Util.Logger.Log("SSEngine.Init idx=" + i + " ddd=" + (LastAppliedDevice ?? "(null=SDK기본)"));
-                    rc = Evo.SSEngine.Init(handSSE[i], language, LastAppliedDevice);
-                    if(rc != 0 && LastAppliedDevice != null) {
-                        Util.Logger.Log("SSEngine.Init idx=" + i + " ddd=" + LastAppliedDevice + " 실패 rc=" + rc + " → null 재시도");
-                        rc = Evo.SSEngine.Init(handSSE[i], language, null);
-                        if(rc == 0) LastAppliedDevice = null;
-                    }
-                    if(rc != 0) {
-                        Console.WriteLine("SnapshotEngine.Allocate() failed. : {0}", rc);
-                        ShowEvoEngineError("SSEngine.Init() 실패. 반환 코드: " + rc, null);
-                        return false;
-                    }
-                    Util.Logger.Log("SSEngine.Init OK idx=" + i + " 적용 ddd=" + (LastAppliedDevice ?? "(SDK기본)"));
+                // 2. Allocate a new snapshot engine — 엔진 1개만 생성해 두 채널이 공유.
+                //    2개 만들면 라이선스 1-인스턴스 환경에서 idx=1이 rc=106(LIC_OVER_MAX_INST)으로 실패 →
+                //    CAM1은 인식되는데 초기화 실패 메시지만 잘못 뜨는 문제. 인식은 RegPlateNo의 lock(obj)로
+                //    직렬화되므로 1 인스턴스로 2채널 충분.
+                handSSE[0] = Evo.SSEngine.Create();
+                if(handSSE[0] < 0) {
+                    var lastRc = Evo.Func.GetLastRC();
+                    Console.WriteLine("SnapshotEngine.Create() failed. : {0}", lastRc);
+                    ShowEvoEngineError("SSEngine.Create() 실패. 반환 코드: " + lastRc, null);
+                    return false;
                 }
+
+                // 3. Initialize the engine.
+                // ddd 형식: "normal(accuracy):GPU,CPU" (CoreLogic 박선임 안내). null이면 SDK 기본 = CPU.
+                Util.Logger.Log("SSEngine.Init ddd=" + (LastAppliedDevice ?? "(null=SDK기본)"));
+                rc = Evo.SSEngine.Init(handSSE[0], language, LastAppliedDevice);
+                if(rc != 0 && LastAppliedDevice != null) {
+                    Util.Logger.Log("SSEngine.Init ddd=" + LastAppliedDevice + " 실패 rc=" + rc + " → null 재시도");
+                    rc = Evo.SSEngine.Init(handSSE[0], language, null);
+                    if(rc == 0) LastAppliedDevice = null;
+                }
+                if(rc != 0) {
+                    Console.WriteLine("SnapshotEngine.Init() failed. : {0}", rc);
+                    ShowEvoEngineError("SSEngine.Init() 실패. 반환 코드: " + rc, null);
+                    return false;
+                }
+                handSSE[1] = handSSE[0];   // 두 채널 공유
+                Util.Logger.Log("SSEngine.Init OK (2채널 공유 1엔진) 적용 ddd=" + (LastAppliedDevice ?? "(SDK기본)"));
                 return true;
             }
             catch(DllNotFoundException ex) {
@@ -985,6 +984,14 @@ namespace KyungsinLPR {
             t.Start();
         }
 
+        /// <summary>환경설정 EvoVersion(6/7)에 따라 인식 경로를 라우팅. 6=CoreLogicV6(구형 SDK), 그 외=v7 현재 엔진.</summary>
+        public static void RegRouted(int Camindex, int idx, bool bRegCarType) {
+            if(frmLprMain.ENV.CameraEnv.EvoVersion == 6)
+                CoreLogicV6.Reg(Camindex, idx, bRegCarType);
+            else
+                Reg(Camindex, idx, bRegCarType);
+        }
+
         public static Result RegPlateNo(int Camindex, int idx, bool bRegCarType) {
             Result result = new Result();
             try {
@@ -1110,10 +1117,14 @@ namespace KyungsinLPR {
         }
 
         public static void Release() {
-            for(int i = 0; i < 2; i++) {
-                Evo.SSEngine.Deinit(handSSE[i]);
-                Evo.Func.FreeObj(ref handSSE[i]);
+            // 2채널 공유 1엔진 — 1번만 해제 (핸들 중복 해제 방지)
+            int h = handSSE[0];
+            if(h >= 0) {
+                Evo.SSEngine.Deinit(h);
+                Evo.Func.FreeObj(ref h);
             }
+            handSSE[0] = -1;
+            handSSE[1] = -1;
         }
 
         // ──────────────────────────────────────────────────

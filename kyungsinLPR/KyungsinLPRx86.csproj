@@ -85,7 +85,21 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>dll\Util.dll</HintPath>
     </Reference>
+    <!-- AForge.NET — USB 카메라 캡처 (DirectShow). NuGet AForge.Video.DirectShow 2.2.5 -->
+    <Reference Include="AForge">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\AForge.dll</HintPath>
+    </Reference>
+    <Reference Include="AForge.Video">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\AForge.Video.dll</HintPath>
+    </Reference>
+    <Reference Include="AForge.Video.DirectShow">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>dll\AForge.Video.DirectShow.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Net.Http" />
@@ -119,10 +133,59 @@
     <Compile Include="Class\Datatable.cs" />
     <Compile Include="Class\DelayReg.cs" />
     <Compile Include="Class\RegModule\CoreLogic.cs" />
+    <Compile Include="Class\RegModule\CoreLogicV6.cs" />
     <Compile Include="Class\RegModule\Elanpr.cs" />
     <Compile Include="Class\LprRelay.cs" />
     <Compile Include="Class\ClsDingtian.cs" />
     <Compile Include="Class\NetWork Display\NetworkDisplay.cs" />
+    <Compile Include="Class\clsLPR.cs" />
+    <Compile Include="Class\RtspPreview.cs" />
+    <Compile Include="Class\RegModule\OptionK.cs" />
+    <Compile Include="Class\RegModule\ServerCamConfig.cs" />
+    <Compile Include="Class\RegModule\clsServerCamEnv.cs" />
+    <Compile Include="Class\Controls\CameraCard.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Class\Controls\ServerModePanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Class\Controls\ServerCamManager.cs" />
+    <Compile Include="Form\frmServerCams.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\frmServerCams.Designer.cs">
+      <DependentUpon>frmServerCams.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Class\USB\USBCamera.cs" />
+    <Compile Include="Class\WGWK\WgwkCamera.cs" />
+    <Compile Include="Form\frmUsbCamSelect.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\UsbCamSettingPanel.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Form\UsbCamSettingPanel.Designer.cs">
+      <DependentUpon>UsbCamSettingPanel.cs</DependentUpon>
+    </Compile>
+    <EmbeddedResource Include="Form\UsbCamSettingPanel.resx">
+      <DependentUpon>UsbCamSettingPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <Compile Include="Form\frmEnv.UsbExt.cs">
+      <DependentUpon>frmEnv.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\frmEnv.WgwkExt.cs">
+      <DependentUpon>frmEnv.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\frmLprMain.Usb.cs">
+      <DependentUpon>frmLprMain.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\frmLprMain.Wgwk.cs">
+      <DependentUpon>frmLprMain.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Class\RegModule\NgisWay.cs" />
     <Compile Include="Class\clsExceptGroup.cs" />
     <Compile Include="Class\부제\NoDriving.cs" />

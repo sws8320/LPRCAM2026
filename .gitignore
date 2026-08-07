@@ -41,6 +41,8 @@ Desktop.ini
 *.traineddata
 # 배포 번들(UPDATE/모델/tessdata)
 SETUP/
+# Evo 6버전 엔진 런타임(설치 SDK Bin\x64에서 복사 — 소스 아님, 대용량 154MB)
+Evo6/
 
 # Claude 설정
 .claude/

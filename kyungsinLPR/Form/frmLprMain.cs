@@ -28,6 +28,8 @@ namespace KyungsinLPR
         // USB(DirectShow/UVC) 카메라 — 카메라별 CameraSource==USB 일 때 사용
         private KyungsinLPR.USB.USBCamera m_camera1_usb = new KyungsinLPR.USB.USBCamera();
         private KyungsinLPR.USB.USBCamera m_camera2_usb = new KyungsinLPR.USB.USBCamera();
+        private KyungsinLPR.WGWK.WgwkCamera m_camera1_wgwk = new KyungsinLPR.WGWK.WgwkCamera();
+        private KyungsinLPR.WGWK.WgwkCamera m_camera2_wgwk = new KyungsinLPR.WGWK.WgwkCamera();
         private Thread m_grabThread1;
         private Thread m_grabThread2;
         private bool m_keepGrab1;
@@ -145,6 +147,7 @@ namespace KyungsinLPR
                 //leess iNova2추가
                 //m_grabThread1 = new Thread(GrabLoop1);
                 if(IsUsbCam(1)) m_grabThread1 = new Thread(GrabLoop1_USB);
+                else if(IsWgwkCam(1)) m_grabThread1 = new Thread(GrabLoop1_Wgwk);
                 else if(ENV.CameraEnv.iNovaType == 1) m_grabThread1 = new Thread(GrabLoop1);
                 else if(ENV.CameraEnv.iNovaType == 2) m_grabThread1 = new Thread(GrabLoop1_iNova2);
                 m_grabThread1.IsBackground = true;
@@ -158,6 +161,7 @@ namespace KyungsinLPR
                 //leess iNova2추가
                 //m_grabThread2 = new Thread(GrabLoop2);
                 if(IsUsbCam(2)) m_grabThread2 = new Thread(GrabLoop2_USB);
+                else if(IsWgwkCam(2)) m_grabThread2 = new Thread(GrabLoop2_Wgwk);
                 else if(ENV.CameraEnv.iNovaType == 1) m_grabThread2 = new Thread(GrabLoop2);
                 else if(ENV.CameraEnv.iNovaType == 2) m_grabThread2 = new Thread(GrabLoop2_iNova2);
                 m_grabThread2.IsBackground = true;
@@ -285,7 +289,7 @@ namespace KyungsinLPR
                                     //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                         && ENV.CameraEnv.RecogMode == 0)
-                                        CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
+                                        CoreLogic.RegRouted(0, CapCnt, ENV.CameraEnv.bRegCarType);
                                     //Option(K) — 자체 CRNN/ONNX (64bit 전용)
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                                         OptionK.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
@@ -461,7 +465,7 @@ namespace KyungsinLPR
                                     //CoreLogic 스트로브 방식만 여기서 인식 (동영상 방식은 FAVEngine 스레드가 처리)
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                         && ENV.CameraEnv.RecogMode == 0)
-                                        CoreLogic.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
+                                        CoreLogic.RegRouted(0, CapCnt, ENV.CameraEnv.bRegCarType);
                                     //Option(K) — 자체 CRNN/ONNX (64bit 전용)
                                     if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                                         OptionK.Reg(0, CapCnt, ENV.CameraEnv.bRegCarType);
@@ -634,7 +638,7 @@ namespace KyungsinLPR
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                 && ENV.CameraEnv.RecogMode == 0) {
 #if WIN64
-                                CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
+                                CoreLogic.RegRouted(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                             }
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK) {
@@ -820,7 +824,7 @@ namespace KyungsinLPR
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic
                                 && ENV.CameraEnv.RecogMode == 0) {
 #if WIN64
-                                CoreLogic.Reg(1, CapCnt, ENV.CameraEnv.bRegCarType);
+                                CoreLogic.RegRouted(1, CapCnt, ENV.CameraEnv.bRegCarType);
 #endif
                             }
                             else if(ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK) {
@@ -1313,6 +1317,14 @@ namespace KyungsinLPR
                 DateTime dt = new DateTime(2000, 1, 1);
                 this.Text += dt.AddDays(version.Build).ToString(" Ver:yyyyMMdd");
                 Util.Logger.Log("프로그램 기동");
+#if WIN64
+                // [자가복구] 이전 LPR이 죽은 뒤 남아 요금계산기(40000)·입차(30000) 리스닝 소켓을 상속·점유 중인
+                //  고아 사이드카(python optionk_server.py)를 '우리 사이드카 시작/소켓 바인딩 전'에 모든 모드에서 정리.
+                //  → 새 LPR이 40000/30000 정상 바인딩 → 무인정산기 접속 복구. (.NET Process.Start 가 소켓을 상속하는 문제 회피)
+                try { OptionK.KillStaleSidecars(); } catch { }
+#endif
+                // [자가복구] WGWK 상시디코딩 고아 ffmpeg(wgwk_live)도 정리 — 이전 세션 잔재가 소켓 상속·점유 방지
+                try { KyungsinLPR.WGWK.WgwkCamera.KillStaleLiveDecoders(); } catch { }
                 InitServerModeUI();   // 서버모드면 카드 그리드 화면(5×3)으로 전환
                 //20161124 Start
                 if(!Directory.Exists(Directory.GetCurrentDirectory() + "\\Back")) {
@@ -1556,6 +1568,18 @@ namespace KyungsinLPR
                 if(ExtendLprtrns)
                     Util.Logger.Log("LPR촬영 로그 확장");
                 if(ENV.StartType != (int)ClsStructure.ProgramStartType.COM) {
+                    // [원격인식] 동작모드가 원격인식(기본2CH-원격인식 or 서버모드 → [OPTIONK]remote=True)이면,
+                    //   판독모듈(CoreLogic/Elwox 등)과 무관하게 서버 원격인식으로 전환한다. (메모리상만 변경 — INI 저장값 유지 → 원격 끄면 원복)
+                    //   서버는 자기 설정(C/K)대로 인식하고, LPR은 /api/lpr/recognize 로 이미지만 보낸다.
+                    {
+                        string _rm = (Util.Function.IniReadValue("OPTIONK", "remote") ?? "").Trim();
+                        bool _remoteMode = _rm.Equals("true", StringComparison.OrdinalIgnoreCase) || _rm == "1";
+                        if(_remoteMode && Environment.Is64BitProcess && ENV.CameraEnv.RegModule != (int)ClsStructure.RegModule.OptionK) {
+                            Util.Logger.Log(string.Format("[원격인식] 동작모드 원격 → 판독모듈 {0} → OptionK(원격 서버인식)로 전환",
+                                (ClsStructure.RegModule)ENV.CameraEnv.RegModule));
+                            ENV.CameraEnv.RegModule = (int)ClsStructure.RegModule.OptionK;
+                        }
+                    }
                     Util.Logger.Log("인식 모듈 설정");
                     if(Environment.Is64BitProcess && (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.Elwox || ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.Ngis)) {
                         MessageBox.Show("64비트 프로세스에서 32비트 인식 모듈이 선택 되었습니다!!!\r\n환경설정을 확인 하세요!!!", "인식 모듈 설정 오류", MessageBoxButtons.OK);
@@ -1595,8 +1619,8 @@ namespace KyungsinLPR
                                     if(IntPtr.Size == 8) {
                                         Util.Logger.Log("IntPtr 8");
                                         try {
-                                            if(ENV.CameraEnv.RecogMode == 1) {
-                                                // 동영상 방식(FAVEngine)
+                                            if(ENV.CameraEnv.RecogMode == 1 && ENV.CameraEnv.EvoVersion != 6) {
+                                                // 동영상 방식(FAVEngine) — v7 전용. v6는 스트로브로 강제(아래 else).
                                                 Util.Logger.Log("FAVEngine 동영상 방식 시작");
                                                 thCoreInit = new Thread(delegate () {
                                                     // 1단계: 전체 채널 Init → OpenLiveView 완료 후 FAVELoop 시작
@@ -1643,7 +1667,21 @@ namespace KyungsinLPR
                                                 // 스트로브 방식(SSEngine) - 기존
                                                 Util.Logger.Log("core init");
                                                 thCoreInit = new Thread(delegate () {
-                                                    CoreLogic.Initialize();
+                                                    try {
+                                                        if(ENV.CameraEnv.EvoVersion == 6)
+                                                            CoreLogicV6.Initialize();   // Evo 6버전: 실행폴더 EvoCSAPI.dll(v6) 리플렉션
+                                                        else
+                                                            CoreLogic.Initialize();     // Evo 7버전: 컴파일타임 v7 API
+                                                    }
+                                                    catch(MissingMethodException mmex) {
+                                                        // 실행폴더 EvoCSAPI.dll이 선택버전과 다르면 v7 API 메서드가 없어 JIT에서 MissingMethod 발생.
+                                                        Util.Logger.Log("[인식엔진] 실행폴더 EvoCSAPI.dll이 선택버전(V"
+                                                            + ENV.CameraEnv.EvoVersion + ")과 일치하지 않습니다. 해당 버전 Evo DLL을 실행폴더에 복사하세요. "
+                                                            + mmex.Message);
+                                                    }
+                                                    catch(Exception cex) {
+                                                        Util.Logger.Log("[인식엔진] 초기화 예외: " + cex.Message);
+                                                    }
                                                 });
                                             }
                                             thCoreInit.IsBackground = true;
@@ -1674,7 +1712,7 @@ namespace KyungsinLPR
                                 Util.Logger.Log("OptionK 원격 인식 모드 — 로컬 사이드카 미실행(ParkingWeb 위임)");
                                 OptionK.Initialize(null);   // 원격 설정만 준비(프로세스 없이 즉시 완료)
                             } else if(_both) {
-                                Util.Logger.Log("OptionK 사이드카 시작(백그라운드) — 카메라서버+자료처리 로컬 인식");
+                                Util.Logger.Log("OptionK 사이드카 시작(백그라운드) — 기본 2CH모드 로컬 인식");
                                 thCoreInit = new Thread(delegate () { OptionK.Initialize(null); });
                                 thCoreInit.IsBackground = true;
                                 thCoreInit.Start();
@@ -1682,7 +1720,7 @@ namespace KyungsinLPR
                                 grpCoreInit.Visible = true;
                                 grpCoreInit.Left = (510 - grpCoreInit.Width) / 2;
                             } else {
-                                Util.Logger.Log("OptionK 로컬 사이드카 미실행 — 카메라서버+자료처리(BOTH) 모드 아님");
+                                Util.Logger.Log("OptionK 로컬 사이드카 미실행 — 기본 2CH모드(BOTH) 아님");
                             }
                         }
 #endif
@@ -1736,8 +1774,8 @@ namespace KyungsinLPR
                 #region CAM Exposure Setting Thread
                 //leess iNova2추가
                 tExposure = null;
-                // 카메라1·2 둘 다 USB이면 노출 제어 스레드 불필요 (USB는 자동노출)
-                bool needExposureThread = !(IsUsbCam(1) && IsUsbCam(2));
+                // 카메라1·2 둘 다 USB/WGWK이면 노출 제어 스레드 불필요 (둘 다 자동노출 — iNova 전용)
+                bool needExposureThread = !((IsUsbCam(1) || IsWgwkCam(1)) && (IsUsbCam(2) || IsWgwkCam(2)));
                 if(needExposureThread)
                 {
                     if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
@@ -1847,20 +1885,30 @@ namespace KyungsinLPR
                     StartCamera_USB(2);
                 }
             }
+            // WGWK-A05D(HTTP 스냅샷) 카메라 연결 — 채널별 (USB와 동일한 선연결 단계)
+            if(ENV.CameraEnv.IPCamera1Info.Use && IsWgwkCam(1)) StartCamera_Wgwk(1);
+            if(ENV.CameraEnv.IPCamera2Info.Use && IsWgwkCam(2)) StartCamera_Wgwk(2);
             // 기존 흐름: iNova IP 카메라가 1개라도 있으면 일괄 시작
-            // (USB만 사용 중인 카메라는 위에서 이미 시작됨 — StartCamera_iNova1/2 내부는 IP가 비어있으면 자동 스킵)
+            // (USB/WGWK 채널은 위에서 이미 연결됨 — StartCamera_iNova1/2 내부는 IP가 비어있거나 USB/WGWK면 자동 스킵)
             if(ENV.CameraEnv.iNovaType == 1) StartCamera_iNova1();
             else if(ENV.CameraEnv.iNovaType == 2) StartCamera_iNova2();
+            else if(ENV.CameraEnv.iNovaType == (int)ClsStructure.CameraSourceType.WGWK)
+            {
+                // 전역 WGWK 모드 — WGWK 채널 그랩 루프 시작 (USB로 개별 지정된 채널은 위에서 이미 시작 처리)
+                if(IsWgwkCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
+                if(IsWgwkCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
+            }
         }
         private void StartCamera_iNova1() {
             // USB로 설정된 채널은 iNova 시작 스킵 (StartCamera()에서 이미 USB 시작됨)
-            if(!IsUsbCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
+            if(!IsUsbCam(1) && !IsWgwkCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use)
                 if(m_camera1.ConnectStreamPort(ENV.CameraEnv.IPCamera1Info.IP, ENV.CameraEnv.IPCamera1Info.StreamUdp)) {
                     m_camera1.ConnectCommandPort(ENV.CameraEnv.IPCamera1Info.IP);
                     StartGrabLoop1();
                 }
             if(IsUsbCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
-            if(!IsUsbCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
+            if(IsWgwkCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
+            if(!IsUsbCam(2) && !IsWgwkCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
                 bool streamOk = m_camera2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp);
                 Util.Logger.Log(string.Format("CAM2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera2Info.IP, streamOk));
                 if(streamOk) {
@@ -1870,9 +1918,10 @@ namespace KyungsinLPR
                 }
             }
             if(IsUsbCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
+            if(IsWgwkCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
         }
         private void StartCamera_iNova2() {
-            if(!IsUsbCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use) {
+            if(!IsUsbCam(1) && !IsWgwkCam(1) && !ENV.CameraEnv.IPCamera1Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera1Info.Use) {
                 iNova2.IPCamError cam1Err = m_camera1_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera1Info.IP, ENV.CameraEnv.IPCamera1Info.StreamUdp);
                 Util.Logger.Log(string.Format("CAM1 iNova2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera1Info.IP, cam1Err));
                 if(cam1Err == iNova2.IPCamError.OK) {
@@ -1883,7 +1932,8 @@ namespace KyungsinLPR
                 }
             }
             if(IsUsbCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
-            if(!IsUsbCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
+            if(IsWgwkCam(1) && ENV.CameraEnv.IPCamera1Info.Use) StartGrabLoop1();
+            if(!IsUsbCam(2) && !IsWgwkCam(2) && !ENV.CameraEnv.IPCamera2Info.IP.Equals(string.Empty) && ENV.CameraEnv.IPCamera2Info.Use) {
                 iNova2.IPCamError streamErr = m_camera2_inova2.ConnectStreamPort(ENV.CameraEnv.IPCamera2Info.IP, ENV.CameraEnv.IPCamera2Info.StreamUdp);
                 Util.Logger.Log(string.Format("CAM2 iNova2 ConnectStreamPort IP={0} result={1}", ENV.CameraEnv.IPCamera2Info.IP, streamErr));
                 if(streamErr == iNova2.IPCamError.OK) {
@@ -1893,6 +1943,7 @@ namespace KyungsinLPR
                 }
             }
             if(IsUsbCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
+            if(IsWgwkCam(2) && ENV.CameraEnv.IPCamera2Info.Use) StartGrabLoop2();
         }
 
         private void StopCamera() {
@@ -1903,6 +1954,8 @@ namespace KyungsinLPR
             // USB 카메라 명시적 해제
             try { if(IsUsbCam(1)) m_camera1_usb.DisconnectStreamPort(); } catch { }
             try { if(IsUsbCam(2)) m_camera2_usb.DisconnectStreamPort(); } catch { }
+            try { if(IsWgwkCam(1)) m_camera1_wgwk.DisconnectStreamPort(); } catch { }
+            try { if(IsWgwkCam(2)) m_camera2_wgwk.DisconnectStreamPort(); } catch { }
         }
 
         private ClsStructure.IPCamera_Info GetCurrentInfo(IPCamera camera, string CamIp) {
@@ -4919,6 +4972,7 @@ namespace KyungsinLPR
             try
             {
                 if (SerialDev == null) { Util.Logger.Log("[RemoteRelayOn] SerialDev null"); return; }
+                if (SerialDev.IsGateHeld(port)) { Util.Logger.Log(string.Format("열림고정 중 — 원격 개방/닫기 펄스 생략 (포트 {0})", port)); return; }
                 if (SerialDev.IsDingtian())
                 {
                     if (SerialDev.Dingtian != null) SerialDev.Dingtian.RelayOn(port, delay, keep);
@@ -4937,12 +4991,20 @@ namespace KyungsinLPR
             catch (Exception ex) { Util.Logger.Log("[RemoteRelayOn] " + ex.Message); }
         }
 
-        /// <summary>원격 OpenFix — KJC1000은 Relay(port,value), 나머지 보드는 RelayOn으로 대체 처리.</summary>
+        /// <summary>원격 OpenFix(열림고정) — value "a"=고정(ON 유지), "b"=해제(OFF).
+        /// DINGTIAN은 RelayHold(래치), KJC1000은 Relay(port,value). (펄스 RelayOn으로 대체하면 고정 안 됨)</summary>
         private void RemoteRelayFix(int port, string value)
         {
             try
             {
                 if (SerialDev == null) { Util.Logger.Log("[RemoteRelayFix] SerialDev null"); return; }
+                bool on = !string.Equals(value, "b", StringComparison.OrdinalIgnoreCase);  // a=고정(ON) / b=해제(OFF)
+                SerialDev.SetGateHold(port, on);   // 열림고정 상태 기록 → 고정 중이면 입차 등 게이트 개방 펄스 생략(장비종류 공통)
+                if (SerialDev.IsDingtian())
+                {
+                    if (SerialDev.Dingtian != null) SerialDev.Dingtian.RelayHold(port, on);
+                    return;
+                }
                 string devName = ENV.CommonEnv.Dio.DioSetting.Dev_Type_Name;
                 if (devName.Equals(ClsStructure.DeviceList.KJC1000.ToString()))
                 {
@@ -4950,7 +5012,7 @@ namespace KyungsinLPR
                 }
                 else
                 {
-                    // DINGTIAN/REALSYS는 Relay(value) 미지원 — 일반 RelayOn 1초로 대체
+                    // REALSYS 등: 지속 ON/OFF API 미확인 — 우선 펄스 대체(고정 미지원, 필요 시 보드별 추가)
                     RemoteRelayOn(port, 0, 1000);
                 }
             }
@@ -5180,12 +5242,33 @@ namespace KyungsinLPR
                                     break;
                             }
                         }
-                        else if (msg == string.Format("{0}CAPTURE{1}", (char)0x02, (char)0x03))
+                        else
                         {
-                            Util.Logger.Log("CAPTURE 수신");
-                            dtRegList1.Rows.Clear();
-                            Capture1 = true;
-                            LastLoopTime1 = DateTime.Now;
+                            // CAPTURE 명령 — STX/ETX/공백/대소문자 유무에 상관없이 인식(외부 프로그램 프레이밍 차이 대응).
+                            //   기존 완전일치(==)는 STX/ETX가 정확히 안 맞으면 캡처가 트리거 안 되던 문제가 있어 관대 매칭으로 변경.
+                            string capCmd = (msg ?? "").Trim((char)0x02, (char)0x03, '\r', '\n', ' ', '\0').ToUpperInvariant();
+                            if (capCmd == "CAPTURE" || capCmd == "CAPTURE1")
+                            {
+                                Util.Logger.Log("CAPTURE 수신 (카메라1)");
+                                dtRegList1.Rows.Clear();
+                                Capture1 = true;
+                                LastLoopTime1 = DateTime.Now;
+                            }
+                            else if (capCmd == "CAPTURE2")
+                            {
+                                Util.Logger.Log("CAPTURE 수신 (카메라2)");
+                                dtRegList2.Rows.Clear();
+                                Capture2 = true;
+                                LastLoopTime2 = DateTime.Now;
+                            }
+                            else if (capCmd.Contains("CAPTURE"))
+                            {
+                                // CAPTURE 계열인데 정확히 안 맞음 → 수신 원본을 바이트로 로그(진단용)
+                                var raw = msg ?? "";
+                                var hex = new System.Text.StringBuilder();
+                                foreach (char c in raw) hex.Append(((int)c).ToString("X2")).Append(' ');
+                                Util.Logger.Log(string.Format("CAPTURE 유사 미인식 chars=[{0}] len={1}", hex.ToString().Trim(), raw.Length));
+                            }
                         }
                     }
                 }
@@ -5305,8 +5388,8 @@ namespace KyungsinLPR
                         Util.Logger.Log(string.Format("Exposure 쓰레드 중단 재기동"));
                         //leess iNova2추가
                         tExposure = null;
-                        // 카메라1·2 둘 다 USB이면 재기동 불필요
-                        if(!(IsUsbCam(1) && IsUsbCam(2)))
+                        // 카메라1·2 둘 다 USB/WGWK이면 재기동 불필요
+                        if(!((IsUsbCam(1) || IsWgwkCam(1)) && (IsUsbCam(2) || IsWgwkCam(2))))
                         {
                             if(ENV.CameraEnv.iNovaType == 1) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova1));
                             else if(ENV.CameraEnv.iNovaType == 2) tExposure = new Thread(new ThreadStart(UserSetting_Exposure_iNova2));
@@ -5384,7 +5467,7 @@ namespace KyungsinLPR
 //#if WIN64
 //                //CoreLogic
 //                if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
-//                    CoreLogic.Reg(0, 0);
+//                    CoreLogic.RegRouted(0, 0);
 //                Util.Logger.Log("AfterRegPlateCam Loop1");
 //                Thread thread = new Thread(delegate ()
 //                {
@@ -5707,7 +5790,7 @@ namespace KyungsinLPR
 #if WIN64
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
-                            CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                            CoreLogic.RegRouted(0, 0, ENV.CameraEnv.bRegCarType);
                         //Option(K)
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                             OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
@@ -5776,7 +5859,7 @@ namespace KyungsinLPR
 #if WIN64
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
-                            CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                            CoreLogic.RegRouted(0, 0, ENV.CameraEnv.bRegCarType);
                         //Option(K)
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                             OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
@@ -5799,7 +5882,7 @@ namespace KyungsinLPR
 #if WIN64
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
-                            CoreLogic.Reg(0, 0, ENV.CameraEnv.bRegCarType);
+                            CoreLogic.RegRouted(0, 0, ENV.CameraEnv.bRegCarType);
                         //Option(K)
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                             OptionK.Reg(0, 0, ENV.CameraEnv.bRegCarType);
@@ -5863,7 +5946,7 @@ namespace KyungsinLPR
 #if WIN64
                         //CoreLogic
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.CoreLogic)
-                            CoreLogic.Reg(1, 0, ENV.CameraEnv.bRegCarType);
+                            CoreLogic.RegRouted(1, 0, ENV.CameraEnv.bRegCarType);
                         //Option(K)
                         if (ENV.CameraEnv.RegModule == (int)ClsStructure.RegModule.OptionK)
                             OptionK.Reg(1, 0, ENV.CameraEnv.bRegCarType);

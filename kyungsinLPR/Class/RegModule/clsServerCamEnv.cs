@@ -30,12 +30,14 @@ namespace KyungsinLPR
         {
             string sm = Util.Function.IniReadValue("OPTIONK", "servermode") ?? "";
             ServerMode = sm.Equals("true", StringComparison.OrdinalIgnoreCase) || sm == "1";
+            // 서버모드에서만 서버캠(3~15) 정산설정 적용·로그. 기본 2CH 모드 등은 서버캠 미사용이므로 건너뜀.
+            if (!ServerMode) return;
             int camCount = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
             if (camCount < 1 || camCount > 15) camCount = 2;
             for (int i = 2; i < camCount && i < 15; i++) ApplyCam(i);
             // 카드1·2(인덱스 0,1)는 정산/게이트는 기존 그대로 두되, 네트워크 전광판만 개별설정([SVRCAM1/2])으로 교체.
             // (서버모드에서는 공통 전광판 탭이 비활성이라, 카드 개별설정이 유일한 전광판 설정 경로)
-            if (ServerMode) { ApplyCardDisplay(0); ApplyCardDisplay(1); }
+            ApplyCardDisplay(0); ApplyCardDisplay(1);
         }
 
         /// <summary>서버모드에서 카드1·2(인덱스 0,1)의 네트워크 전광판을 개별설정([SVRCAM{n}])으로 덮어쓴다.

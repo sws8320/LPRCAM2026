@@ -70,6 +70,9 @@
     <Reference Include="EvoCSAPI">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>dll\EvoCSAPI.dll</HintPath>
+      <!-- 출력폴더로 복사하지 않음: 엔진 DLL(EvoCSAPI+native)은 PC의 설치버전(V6/V7)에 맞게 별도 복사.
+           빌드는 dll\EvoCSAPI.dll(v7 API)로 컴파일만 하고, 실행 시엔 폴더에 놓인 버전을 사용. -->
+      <Private>False</Private>
     </Reference>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
@@ -139,13 +142,14 @@
     <Compile Include="Class\Datatable.cs" />
     <Compile Include="Class\DelayReg.cs" />
     <Compile Include="Class\RegModule\CoreLogic.cs" />
+    <Compile Include="Class\RegModule\CoreLogicV6.cs" />
     <Compile Include="Class\RtspPreview.cs" />
     <Compile Include="Class\RegModule\Elanpr.cs" />
     <Compile Include="Class\RegModule\OptionK.cs" />
     <Compile Include="Class\RegModule\ServerCamConfig.cs" />
     <Compile Include="Class\RegModule\clsServerCamEnv.cs" />
     <Compile Include="Class\Controls\CameraCard.cs">
-      <SubType>UserControl</SubType>
+      <SubType>Component</SubType>
     </Compile>
     <Compile Include="Class\Controls\ServerModePanel.cs">
       <SubType>Component</SubType>
@@ -155,6 +159,7 @@
     <Compile Include="Class\ClsDingtian.cs" />
     <Compile Include="Class\NetWork Display\NetworkDisplay.cs" />
     <Compile Include="Class\USB\USBCamera.cs" />
+    <Compile Include="Class\WGWK\WgwkCamera.cs" />
     <Compile Include="Form\frmUsbCamSelect.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -171,7 +176,15 @@
       <DependentUpon>frmEnv.cs</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Form\frmEnv.WgwkExt.cs">
+      <DependentUpon>frmEnv.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Form\frmLprMain.Usb.cs">
+      <DependentUpon>frmLprMain.cs</DependentUpon>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Form\frmLprMain.Wgwk.cs">
       <DependentUpon>frmLprMain.cs</DependentUpon>
       <SubType>Form</SubType>
     </Compile>
@@ -350,7 +363,7 @@
       <_UpdateOutFiles Include="$(OutputPath)AForge.dll" />
       <_UpdateOutFiles Include="$(OutputPath)AForge.Video.dll" />
       <_UpdateOutFiles Include="$(OutputPath)AForge.Video.DirectShow.dll" />
-      <_UpdateOutFiles Include="$(OutputPath)EvoCSAPI.dll" />
+      <!-- EvoCSAPI.dll(래퍼) + Evo native는 자동배포 제외: PC의 설치버전(V6/V7)에 맞게 별도 복사(동시설치 없음) -->
       <_UpdateOutFiles Include="$(OutputPath)SDKNetLib.dll" />
       <_UpdateOutFiles Include="$(OutputPath)LibSocket.dll" />
       <_UpdateOutFiles Include="$(OutputPath)SerialDevice.dll" />
@@ -370,6 +383,6 @@
     <MakeDir Directories="$(CentralUpdate)" Condition="Exists('D:\license-plate-recognition\UPDATE')" />
     <Copy SourceFiles="@(_UpdateOutFiles)" DestinationFolder="$(CentralUpdate)\" SkipUnchangedFiles="true" Condition="Exists('$(CentralUpdate)') And Exists('%(FullPath)')" />
     <Copy SourceFiles="@(_UpdateDllFiles)" DestinationFolder="$(CentralUpdate)\" SkipUnchangedFiles="true" Condition="Exists('$(CentralUpdate)') And Exists('%(FullPath)')" />
-    <Message Importance="high" Text="→ UPDATE 복사 완료: $(ProjectDir)..\SETUP\UPDATE\ + D:\license-plate-recognition\UPDATE\LPR (Option(K)는 OptionK_server 사이드카 별도)." />
+    <Message Importance="high" Text="→ UPDATE 복사 완료: $(ProjectDir)..\SETUP\UPDATE\ + D:\license-plate-recognition\UPDATE\LPR (Evo 엔진 DLL은 PC 버전별 수동복사, Option(K)는 사이드카 별도)." />
   </Target>
 </Project>

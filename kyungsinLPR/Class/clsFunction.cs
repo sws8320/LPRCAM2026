@@ -79,6 +79,11 @@ namespace KyungsinLPR
             EnvInfo.CameraEnv.IPCamera1Info.UsbDeviceName = ReadIni("CAMERA", "cam1usbname");
             EnvInfo.CameraEnv.IPCamera1Info.UsbResolutionWidth = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1usbwidth"));
             EnvInfo.CameraEnv.IPCamera1Info.UsbResolutionHeight = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1usbheight"));
+            // WGWK-A05D (HTTP snapshot.cgi) — 호스트는 cam1ip 재사용
+            EnvInfo.CameraEnv.IPCamera1Info.WgwkPort = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1wgwkport"));
+            EnvInfo.CameraEnv.IPCamera1Info.WgwkUser = ReadIni("CAMERA", "cam1wgwkuser");
+            EnvInfo.CameraEnv.IPCamera1Info.WgwkPass = ReadIni("CAMERA", "cam1wgwkpass");
+            EnvInfo.CameraEnv.IPCamera1Info.WgwkStream = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1wgwkstream"));
             //EnvInfo.CameraEnv.IPCamera1Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM1", "etcsave"));
             //EnvInfo.CameraEnv.IPCamera1Info.ImageSave.EtcPath = ReadIni("IPCAM1", "etcpath");
             EnvInfo.CameraEnv.IPCamera1Info.User_Setting_Resend_Interval = Util.Function.IntTryParse(ReadIni("CAMERA", "cam1interval"));
@@ -154,6 +159,20 @@ namespace KyungsinLPR
             EnvInfo.CameraEnv.IPCamera2Info.UsbDeviceName = ReadIni("CAMERA", "cam2usbname");
             EnvInfo.CameraEnv.IPCamera2Info.UsbResolutionWidth = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2usbwidth"));
             EnvInfo.CameraEnv.IPCamera2Info.UsbResolutionHeight = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2usbheight"));
+            // WGWK-A05D (HTTP snapshot.cgi) — 호스트는 cam2ip 재사용
+            EnvInfo.CameraEnv.IPCamera2Info.WgwkPort = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2wgwkport"));
+            EnvInfo.CameraEnv.IPCamera2Info.WgwkUser = ReadIni("CAMERA", "cam2wgwkuser");
+            EnvInfo.CameraEnv.IPCamera2Info.WgwkPass = ReadIni("CAMERA", "cam2wgwkpass");
+            EnvInfo.CameraEnv.IPCamera2Info.WgwkStream = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2wgwkstream"));
+            // 레거시 이관: 과거 전역 iNovaType=4(WGWK)로 저장된 설정 → 카메라별 CameraSource=WGWK 로 변환하고 iNovaType은 iNova1로 복원
+            if (EnvInfo.CameraEnv.iNovaType == (int)ClsStructure.CameraSourceType.WGWK)
+            {
+                if (EnvInfo.CameraEnv.IPCamera1Info.CameraSource != (int)ClsStructure.CameraSourceType.USB)
+                    EnvInfo.CameraEnv.IPCamera1Info.CameraSource = (int)ClsStructure.CameraSourceType.WGWK;
+                if (EnvInfo.CameraEnv.IPCamera2Info.CameraSource != (int)ClsStructure.CameraSourceType.USB)
+                    EnvInfo.CameraEnv.IPCamera2Info.CameraSource = (int)ClsStructure.CameraSourceType.WGWK;
+                EnvInfo.CameraEnv.iNovaType = 1;
+            }
             //EnvInfo.CameraEnv.IPCamera2Info.ImageSave.EtcSave = Util.Function.BoolTryParse(ReadIni("IPCAM2", "etcsave"));
             //EnvInfo.CameraEnv.IPCamera2Info.ImageSave.EtcPath = ReadIni("IPCAM2", "etcpath");
             EnvInfo.CameraEnv.IPCamera2Info.User_Setting_Resend_Interval = Util.Function.IntTryParse(ReadIni("CAMERA", "cam2interval"));
@@ -231,6 +250,9 @@ namespace KyungsinLPR
             int.TryParse(Util.Function.IniReadValue("CAMERA", "regtype"), out EnvInfo.CameraEnv.CoreType);
             int.TryParse(Util.Function.IniReadValue("CAMERA", "regcountrytype"), out EnvInfo.CameraEnv.CoreCountry);
             int.TryParse(Util.Function.IniReadValue("CAMERA", "recogmode"), out EnvInfo.CameraEnv.RecogMode);
+            int.TryParse(Util.Function.IniReadValue("CAMERA", "evoversion"), out EnvInfo.CameraEnv.EvoVersion);
+            if (EnvInfo.CameraEnv.EvoVersion != 6 && EnvInfo.CameraEnv.EvoVersion != 7)
+                EnvInfo.CameraEnv.EvoVersion = 7;   // 미설정/구설정은 기본 7 (현재 동작 유지)
             if (EnvInfo.CameraEnv.CoreCountry <= 0)
                 EnvInfo.CameraEnv.CoreCountry = CoreLogic.KOR;
             CoreLogic.cc = EnvInfo.CameraEnv.CoreCountry;
@@ -424,6 +446,7 @@ namespace KyungsinLPR
             EnvInfo.CommunicationEnv.ReturnCar.Use = Util.Function.BoolTryParse(ReadIni("DataProcess", "ReturnUse"));
             EnvInfo.CommunicationEnv.ReturnCar.Term =  Util.Function.IntTryParse(ReadIni("DataProcess", "ReturnTerm"));
             EnvInfo.CommunicationEnv.ReturnCar.Ment = ReadIni("DataProcess", "ReturnMent");
+            EnvInfo.CommunicationEnv.UseVisitor = Util.Function.BoolTryParse(ReadIni("DataProcess", "UseVisitor"));
             #endregion
             EnvInfo.SendOffice = Util.Function.BoolTryParse(ReadIni("COMMUNICATION", "sendOffice"));
 
@@ -537,6 +560,10 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "cam1usbname", env.CameraEnv.IPCamera1Info.UsbDeviceName ?? "");
             WriteIni("CAMERA", "cam1usbwidth", env.CameraEnv.IPCamera1Info.UsbResolutionWidth);
             WriteIni("CAMERA", "cam1usbheight", env.CameraEnv.IPCamera1Info.UsbResolutionHeight);
+            WriteIni("CAMERA", "cam1wgwkport", env.CameraEnv.IPCamera1Info.WgwkPort);
+            WriteIni("CAMERA", "cam1wgwkuser", env.CameraEnv.IPCamera1Info.WgwkUser ?? "");
+            WriteIni("CAMERA", "cam1wgwkpass", env.CameraEnv.IPCamera1Info.WgwkPass ?? "");
+            WriteIni("CAMERA", "cam1wgwkstream", env.CameraEnv.IPCamera1Info.WgwkStream);
             //WriteIni("IPCAM1", "etcsave", env.CameraEnv.IPCamera1Info.ImageSave.EtcSave);
             //WriteIni("IPCAM1", "etcpath", env.CameraEnv.IPCamera1Info.ImageSave.EtcPath);
             WriteIni("CAMERA", "cam1interval", env.CameraEnv.IPCamera1Info.User_Setting_Resend_Interval);
@@ -600,6 +627,10 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "cam2usbname", env.CameraEnv.IPCamera2Info.UsbDeviceName ?? "");
             WriteIni("CAMERA", "cam2usbwidth", env.CameraEnv.IPCamera2Info.UsbResolutionWidth);
             WriteIni("CAMERA", "cam2usbheight", env.CameraEnv.IPCamera2Info.UsbResolutionHeight);
+            WriteIni("CAMERA", "cam2wgwkport", env.CameraEnv.IPCamera2Info.WgwkPort);
+            WriteIni("CAMERA", "cam2wgwkuser", env.CameraEnv.IPCamera2Info.WgwkUser ?? "");
+            WriteIni("CAMERA", "cam2wgwkpass", env.CameraEnv.IPCamera2Info.WgwkPass ?? "");
+            WriteIni("CAMERA", "cam2wgwkstream", env.CameraEnv.IPCamera2Info.WgwkStream);
             //WriteIni("IPCAM2", "etcsave", env.CameraEnv.IPCamera2Info.ImageSave.EtcSave);
             //WriteIni("IPCAM2", "etcpath", env.CameraEnv.IPCamera2Info.ImageSave.EtcPath);
             WriteIni("CAMERA", "cam2interval", env.CameraEnv.IPCamera2Info.User_Setting_Resend_Interval);
@@ -668,6 +699,7 @@ namespace KyungsinLPR
             WriteIni("CAMERA", "regcountrytype", env.CameraEnv.CoreCountry);
             WriteIni("CAMERA", "regcartype", env.CameraEnv.bRegCarType);
             WriteIni("CAMERA", "recogmode", env.CameraEnv.RecogMode);
+            WriteIni("CAMERA", "evoversion", env.CameraEnv.EvoVersion == 6 ? 6 : 7);
 
             string tmp = "";
             foreach (ClsStructure.SmallCarRate item in env.CameraEnv.RegCarRate)
@@ -850,6 +882,7 @@ namespace KyungsinLPR
             WriteIni("DataProcess", "ReturnUse", env.CommunicationEnv.ReturnCar.Use);
             WriteIni("DataProcess", "ReturnTerm", env.CommunicationEnv.ReturnCar.Term);
             WriteIni("DataProcess", "ReturnMent", env.CommunicationEnv.ReturnCar.Ment);
+            WriteIni("DataProcess", "UseVisitor", env.CommunicationEnv.UseVisitor);
             #endregion
 
             WriteIni("COMMUNICATION", "sendOffice", env.SendOffice.ToString());

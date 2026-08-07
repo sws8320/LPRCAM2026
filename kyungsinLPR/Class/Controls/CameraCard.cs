@@ -4,6 +4,27 @@ using System.Windows.Forms;
 
 namespace KyungsinLPR
 {
+    /// <summary>영상을 영역에 꽉 채우는 PictureBox — 비율 유지, 넘치는 가장자리만 잘라냄(cover). 검은 여백 없음.</summary>
+    internal class CoverPictureBox : PictureBox
+    {
+        public CoverPictureBox() { DoubleBuffered = true; }
+        protected override void OnPaint(PaintEventArgs pe)
+        {
+            var img = this.Image;
+            var g = pe.Graphics;
+            g.Clear(this.BackColor);
+            if (img == null) return;
+            int iw = img.Width, ih = img.Height, cw = ClientSize.Width, ch = ClientSize.Height;
+            if (iw <= 0 || ih <= 0 || cw <= 0 || ch <= 0) return;
+            double scale = Math.Max((double)cw / iw, (double)ch / ih);   // cover: 큰 배율로 꽉 채움
+            int dw = (int)Math.Round(iw * scale), dh = (int)Math.Round(ih * scale);
+            int dx = (cw - dw) / 2, dy = (ch - dh) / 2;                  // 가운데 정렬(넘침 crop)
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBilinear;
+            g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+            g.DrawImage(img, dx, dy, dw, dh);
+        }
+    }
+
     /// <summary>
     /// 서버모드 카메라 카드 1장 — 헤더(이름+시각) · 영상 · 인식결과 · 입출차/일반 태그 ·
     /// 열기/닫기/고정 버튼 · 최근이력. 동적 생성(코드 빌드).
@@ -42,8 +63,8 @@ namespace KyungsinLPR
             Cfg = cfg;
             _accent = cfg.GateType == 1 ? Color.FromArgb(220, 80, 90) : Color.FromArgb(70, 200, 130);
 
-            // Dock 콘텐츠 합(헤더26+영상120+차번42+태그22+버튼32=242). 최근이력 제거로 높이 축소
-            this.Size = new Size(286, 248);
+            // Dock 콘텐츠 합(헤더26+영상160+차번42+태그22+버튼32=282). 영상칸을 16:9(284x160)로 확대
+            this.Size = new Size(286, 288);
             this.Margin = new Padding(6);
             this.BackColor = Color.FromArgb(26, 41, 66);
             this.Padding = new Padding(1);
@@ -72,7 +93,7 @@ namespace KyungsinLPR
             header.Controls.Add(_time);
 
             // --- 영상 ---
-            _video = new PictureBox { Dock = DockStyle.Top, Height = 120, BackColor = Color.Black, SizeMode = PictureBoxSizeMode.Zoom };
+            _video = new CoverPictureBox { Dock = DockStyle.Top, Height = 160, BackColor = Color.Black };   // cover: 꽉 채움(넘치는 가장자리 crop, 검은여백 없음)
             _stamp = new Label { AutoSize = true, ForeColor = Color.White, BackColor = Color.Transparent, Font = new Font("Segoe UI", 7.5f), Text = "" };
             _video.Controls.Add(_stamp);
             _video.Resize += delegate { _stamp.Location = new Point(Math.Max(0, _video.Width - _stamp.Width - 4), Math.Max(0, _video.Height - _stamp.Height - 2)); };

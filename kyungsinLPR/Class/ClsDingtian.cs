@@ -68,12 +68,19 @@ namespace KyungsinLPR
             PollingThread = null;
         }
 
+        // 열림고정(OpenFix) 중인 릴레이 포트(1~8) — true면 RelayOn(게이트 열림 펄스)을 아예 무시.
+        //   RelayHold(port,true)=고정 set / RelayHold(port,false)=해제 clear.
+        //   → 고정 상태에선 차량 입차 등으로 열림 펄스가 나가도 신호를 안 보냄(이미 열림 유지 중이라 고정 안 풀림).
+        private readonly bool[] _held = new bool[9];
+
         /// <summary>
         /// 릴레이 펄스 — KJC1000.RelayOn 과 동일 시그니처. delay ms 후 ON, keep ms 후 OFF
+        /// (단, 해당 포트가 열림고정(_held) 중이면 펄스를 보내지 않고 무시 → 계속 열림 유지)
         /// </summary>
         public void RelayOn(int port, int delay, int keep)
         {
             if (port < 1 || port > 8) return;
+            if (_held[port]) return;   // 열림고정 중인 포트는 열림 펄스(입차 등)를 보내지 않음
             try
             {
                 if (delay > 0) Thread.Sleep(delay);
@@ -109,6 +116,41 @@ namespace KyungsinLPR
             catch (Exception ex)
             {
                 Util.Logger.Log("DINGTIAN RelayOn 실패: " + ex.Message);
+            }
+        }
+
+        /// <summary>릴레이 고정/해제 — OFF를 보내지 않고 상태를 유지한다(래치).
+        /// on=true: ON만 전송 → 차단기 열림 고정. on=false: OFF만 전송 → 고정 해제(닫힘).
+        /// RelayOn(펄스)과 달리 자동 OFF 하지 않는다. TCP→UDP 폴백은 RelayOn과 동일.</summary>
+        public void RelayHold(int port, bool on)
+        {
+            if (port < 1 || port > 8) return;
+            _held[port] = on;   // 열림고정 상태 기억 → 고정 중이면 RelayOn(입차 등 열림 펄스)을 이 포트로 안 보냄
+            try
+            {
+                byte[] cmd = Encoding.ASCII.GetBytes(string.Format("{0}{1}", on ? 1 : 2, port));
+                bool tryTcp = !PreferUdp || (++_udpProbe % 30 == 0);
+                if (tryTcp)
+                {
+                    try
+                    {
+                        SendTcp(cmd);
+                        if (PreferUdp) Util.Logger.Log("DINGTIAN TCP 복구 — TCP 전환");
+                        PreferUdp = false;
+                        return;
+                    }
+                    catch (Exception tcpEx)
+                    {
+                        if (!PreferUdp)
+                            Util.Logger.Log(string.Format("DINGTIAN TCP 실패({0}) → UDP 전환", tcpEx.Message));
+                        PreferUdp = true;
+                    }
+                }
+                SendUdp(cmd);
+            }
+            catch (Exception ex)
+            {
+                Util.Logger.Log("DINGTIAN RelayHold 실패: " + ex.Message);
             }
         }
 

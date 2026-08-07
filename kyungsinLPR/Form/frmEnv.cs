@@ -57,7 +57,8 @@ namespace KyungsinLPR
             lblCamCount = new Label { Text = "사용 대수", AutoSize = true, Location = new System.Drawing.Point(8, 116) };
             cboCamCount = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList,
                                          Location = new System.Drawing.Point(72, 112), Size = new System.Drawing.Size(56, 20) };
-            for (int i = 1; i <= ServerCamConfig.MAX; i++) cboCamCount.Items.Add(i.ToString());
+            // 서버모드는 통상 3대 이상 사용 → 사용대수 선택은 3부터 표시 (1,2 제외)
+            for (int i = 3; i <= ServerCamConfig.MAX; i++) cboCamCount.Items.Add(i.ToString());
             groupBox11.Controls.Add(lblCamCount);
             groupBox11.Controls.Add(cboCamCount);
             // 카메라 개별설정용 '카드 표시 이름' 입력칸(탭 위쪽 빈 영역, perCam 모드만 표시)
@@ -71,16 +72,13 @@ namespace KyungsinLPR
                 chkOcrRemoteNoUpload.Enabled = chkOcrRemote.Checked;
                 if (!chkOcrRemote.Checked) chkOcrRemoteNoUpload.Checked = false;
             };
-            lstLprList.View = View.Details;
-            lstLprList.FullRowSelect = true;
-            lstLprList.GridLines = true;
-            lstLprList.MultiSelect = false;
-            lstLprList.Columns.Add("No", 50);
-            lstLprList.Columns.Add("CHNO", 50);
-            lstLprList.Columns.Add("IP", 150);
-            lstLprList.Columns.Add("Port", 50);
-            lstLprList.Columns.Add("Type", 50);
-        }      
+            // 동작모드 ↔ 원격 차번인식 연동: 원격 인식 모드(기본2CH-원격인식=rdStartCam, 서버모드=rdbServerMode)면
+            //  '원격 차번인식 사용' 활성+체크, 그 외 모드(인식X-ONLY자료처리=rdStartCom, 기본2CH모드=rdStartBoth)면 해제+비활성
+            rdStartCam.CheckedChanged += delegate { UpdateRemoteOcrByMode(); };
+            rdStartBoth.CheckedChanged += delegate { UpdateRemoteOcrByMode(); };
+            rdStartCom.CheckedChanged += delegate { UpdateRemoteOcrByMode(); };
+            rdbServerMode.CheckedChanged += delegate { UpdateRemoteOcrByMode(); };
+        }
 
         public string folder()
         {
@@ -238,6 +236,7 @@ namespace KyungsinLPR
             txtBusinessDisplayMent.Text = clsBusinessCar.DisPlayLineMent;
 
             InitUsbExtension(); // USB 카메라 설정 컨트롤 동적 추가
+            InitWgwkExtension(); // WGWK-A05D 접속정보 컨트롤 동적 추가
 
             // [중요] setEnv()(전역값)로 컨트롤을 모두 채운 '이후'에 서버모드 개별값/필터를 적용.
             //  (SetServerCamMode 는 ShowDialog 전에 호출되어 이 Load 보다 먼저 실행되므로 여기서 다시 적용)
@@ -387,6 +386,13 @@ namespace KyungsinLPR
             else
                 rdbTha.Checked = true;
 
+            // Evo 인식엔진 버전 (V6/V7) — 현장 옛 6버전 SDK 호환용. 기본 V7. Option(C) 전용, KOR/THA와 독립.
+            if (env.CameraEnv.EvoVersion == 6)
+                rdbEvo6.Checked = true;
+            else
+                rdbEvo7.Checked = true;
+            panelEvoVer.Enabled = rdbCore.Checked;
+
             chkRegCarType.Checked = env.CameraEnv.bRegCarType;
 
             // 동영상 인식 방식 설정 로드
@@ -407,7 +413,9 @@ namespace KyungsinLPR
             #endregion
 
             #region LPR 장비 설정
-            cmbCameraType.SelectedIndex = env.CameraEnv.iNovaType - 1;//leess iNova2추가
+            // iNovaType 1=iNova1(idx0), 2=iNova2(idx1), 4=WGWK-A05D(idx2)
+            cmbCameraType.SelectedIndex = (env.CameraEnv.iNovaType == (int)ClsStructure.CameraSourceType.WGWK) ? 2
+                                        : (env.CameraEnv.iNovaType == 2) ? 1 : 0;
             ChkLPRUse1.Checked = env.CommunicationEnv.Lpr1Info.Use;
             txtEqpmNo1.Text = env.CommunicationEnv.Lpr1Info.EqpmNo.ToString();
             txtLPRNo1.Text = env.CommunicationEnv.Lpr1Info.ChNo;
@@ -594,6 +602,7 @@ namespace KyungsinLPR
             chkUseReturn.Checked = env.CommunicationEnv.ReturnCar.Use;
             txtReturnTerm.Text = env.CommunicationEnv.ReturnCar.Term.ToString();
             txtReturnMent.Text = env.CommunicationEnv.ReturnCar.Ment;
+            chkUseVisitor.Checked = env.CommunicationEnv.UseVisitor;
             #endregion
             chkSendOffice.Checked = env.SendOffice;
 
@@ -747,9 +756,11 @@ namespace KyungsinLPR
                     chkOcrRemoteNoUpload.Checked = chkOcrRemoteNoUpload.Enabled &&
                         (rmnu.Equals("true", StringComparison.OrdinalIgnoreCase) || rmnu == "1");
                 }
-                // 서버모드 사용 카메라 대수 로드(기본 2)
+                // 동작모드 기준으로 '원격 차번인식 사용' 상태 최종 강제 (모드가 remote 여부를 결정)
+                UpdateRemoteOcrByMode();
+                // 서버모드 사용 카메라 대수 로드(최소 3, 기본 3 — 1,2는 선택목록에서 제외)
                 int camCnt = Util.Function.IntTryParse(Util.Function.IniReadValue("OPTIONK", "camcount"));
-                if (camCnt < 1 || camCnt > ServerCamConfig.MAX) camCnt = 2;
+                if (camCnt < 3 || camCnt > ServerCamConfig.MAX) camCnt = 3;
                 cboCamCount.SelectedItem = camCnt.ToString();
             }
             catch (Exception) { }
@@ -1080,6 +1091,7 @@ namespace KyungsinLPR
             txtFrameRate.Text = env.CameraEnv.IPCamera1Info.FrameRate.ToString();
             cmbTriggerMode.SelectedIndex = env.CameraEnv.IPCamera1Info.TriggerMode;
             RefreshUsbExtensionForCam(1);
+            RefreshWgwkExtensionForCam(1);
         }
 
         private void btnCam2_Click(object sender, EventArgs e)
@@ -1235,6 +1247,7 @@ namespace KyungsinLPR
             txtFrameRate.Text = env.CameraEnv.IPCamera2Info.FrameRate.ToString();
             cmbTriggerMode.SelectedIndex = env.CameraEnv.IPCamera2Info.TriggerMode;
             RefreshUsbExtensionForCam(2);
+            RefreshWgwkExtensionForCam(2);
         }
 
         private void btnEnvSave_Click(object sender, EventArgs e)
@@ -1362,6 +1375,7 @@ namespace KyungsinLPR
                 clsExceptGroup.Set_Except_Group("-1");
 
             ApplyUsbStateToEnv(); // USB 카메라 상태를 ENV 구조체에 반영
+            ApplyWgwkStateToEnv(); // WGWK-A05D 접속정보를 ENV 구조체에 반영
             //leess ini에 저장
             func.SetEnv(env);
 
@@ -1442,10 +1456,11 @@ namespace KyungsinLPR
                 clsImageUploader.SaveIni(chkUploadEnabled.Checked, txtUploadServerUrl.Text, txtUploadApiKey.Text);
                 // 서버모드(카드 화면) → servermode, 원격 차번인식 → remote (별개 저장)
                 Util.Function.IniWriteValue("OPTIONK", "servermode", rdbServerMode.Checked.ToString());
-                if (chkOcrRemote != null)
-                    Util.Function.IniWriteValue("OPTIONK", "remote", chkOcrRemote.Checked.ToString());
-                // 원격 차번인식만 사용(이미지 업로드 안함) — remote 체크 시에만 유효
-                bool ocrNoUpload = chkOcrRemoteNoUpload != null && chkOcrRemoteNoUpload.Checked && chkOcrRemote != null && chkOcrRemote.Checked;
+                // 원격 차번인식 = 동작모드로 결정 (기본2CH-원격인식=rdStartCam, 서버모드=rdbServerMode → True / 그 외 False)
+                bool remoteByMode = rdStartCam.Checked || rdbServerMode.Checked;
+                Util.Function.IniWriteValue("OPTIONK", "remote", remoteByMode.ToString());
+                // 원격 차번인식만 사용(이미지 업로드 안함) — remote 일 때만 유효
+                bool ocrNoUpload = remoteByMode && chkOcrRemoteNoUpload != null && chkOcrRemoteNoUpload.Checked;
                 Util.Function.IniWriteValue("OPTIONK", "remote_noupload", ocrNoUpload.ToString());
                 clsImageUploader.Reload();   // remote_noupload 기록 후 재기동(SaveIni의 Reload는 이 값 기록 전이라 한 번 더)
                 // 서버모드 사용 카메라 대수 저장
@@ -1611,8 +1626,9 @@ namespace KyungsinLPR
             #endregion
 
             #region 카메라설정
-            //leess iNova2추가
-            env.CameraEnv.iNovaType = cmbCameraType.SelectedIndex + 1;
+            //leess iNova2추가 / WGWK(idx2)는 카메라별 CameraSource라 전역 iNovaType 미변경
+            if (cmbCameraType.SelectedIndex != 2)
+                env.CameraEnv.iNovaType = cmbCameraType.SelectedIndex + 1;
 
             if(groupBox1.Text.Substring(0, 1).Equals("1"))
             {
@@ -1880,6 +1896,8 @@ namespace KyungsinLPR
             else
                 env.CameraEnv.CoreCountry = CoreLogic.THA;
 
+            env.CameraEnv.EvoVersion = rdbEvo6.Checked ? 6 : 7;
+
             if (cmbImageProcType.SelectedItem.Equals(ClsStructure.ImageProceType.번호판확인))
                 env.CameraEnv.PlateArea = true;
             else if (cmbImageProcType.SelectedItem.Equals(ClsStructure.ImageProceType.이미지자르기))
@@ -2090,6 +2108,7 @@ namespace KyungsinLPR
             env.CommunicationEnv.ReturnCar.Use = chkUseReturn.Checked;
             env.CommunicationEnv.ReturnCar.Term = Util.Function.IntTryParse(txtReturnTerm.Text);
             env.CommunicationEnv.ReturnCar.Ment = txtReturnMent.Text;
+            env.CommunicationEnv.UseVisitor = chkUseVisitor.Checked;
             #endregion
 
             //env.DupTerm = Util.Function.IntTryParse(txtCustomerInterval.Text);
@@ -2950,6 +2969,7 @@ namespace KyungsinLPR
             // CPU/GPU(panel1) 는 Option(C) 또는 Option(K) 에서 사용
             panel1.Enabled = rdbCore.Checked || rdbOptionK.Checked;
             panel5.Enabled = rdbCore.Checked;
+            panelEvoVer.Enabled = rdbCore.Checked;   // Evo 엔진버전(V6/V7)은 Option(C)에서만
             chkRegCarType.Enabled = rdbCore.Checked;
         }
 
@@ -3024,6 +3044,9 @@ namespace KyungsinLPR
                 bool server = rm.Equals("true", StringComparison.OrdinalIgnoreCase) || rm == "1";
                 bool perCam = _serverCamIndex >= 0;
                 if (!server && !perCam) return;   // 일반 프로그램 모드 → 손대지 않음
+
+                // 서버모드에선 USB 카메라 설정 패널 숨김(서버모드는 iNova1/iNova2/WGWK만 지원)
+                if (usbCamPanel != null) usbCamPanel.Visible = false;
 
                 // 카메라설정/차단기설정/전광판설정 탭: 공통=비활성, 개별=활성
                 tabCam.Enabled = perCam;
@@ -3102,6 +3125,9 @@ namespace KyungsinLPR
                 //  대신, 값들을 모아 [SVRCAM{n}] 섹션을 1회 읽기 + 1회 쓰기로 배치 저장.
                 var pcDict = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 pcDict["percam_configured"] = "true";
+                // 카메라 소스(서버모드): 콤보 인덱스 0=iNova1→1, 1=iNova2→2, 2=WGWK-A05D→4
+                if (cmbCameraType != null)
+                    pcDict["camsource"] = ((cmbCameraType.SelectedIndex == 2) ? 4 : (cmbCameraType.SelectedIndex + 1)).ToString();
                 foreach (System.Windows.Forms.Control r in PerCamRoots()) WalkPerCamCollect(pcDict, r);
                 // 카드 표시 이름(직접 입력) → [SVRCAM{n}].name
                 if (txtCamCardName != null && !string.IsNullOrEmpty(txtCamCardName.Text))
@@ -3284,14 +3310,26 @@ namespace KyungsinLPR
 
         private void rdStartCom_CheckedChanged(object sender, EventArgs e)
         {
-            lstLprList.Enabled = rdStartCom.Checked;
         }
 
-        private void lstLprList_KeyUp(object sender, KeyEventArgs e)
+        /// <summary>
+        /// 동작모드에 따라 '원격 차번인식 사용'(chkOcrRemote) 상태 연동.
+        /// 원격 인식 모드(기본2CH-원격인식=rdStartCam, 서버모드=rdbServerMode): 활성+체크.
+        /// 그 외(인식X-ONLY자료처리=rdStartCom, 기본2CH모드=rdStartBoth): 체크 해제+비활성(선택 불가).
+        /// </summary>
+        private void UpdateRemoteOcrByMode()
         {
-            if (e.KeyCode == Keys.Delete)
+            if (chkOcrRemote == null) return;
+            bool remoteMode = rdStartCam.Checked || rdbServerMode.Checked;
+            if (remoteMode)
             {
-                lstLprList.Items.Remove(lstLprList.SelectedItems[0]);
+                chkOcrRemote.Enabled = true;
+                if (!chkOcrRemote.Checked) chkOcrRemote.Checked = true;
+            }
+            else
+            {
+                if (chkOcrRemote.Checked) chkOcrRemote.Checked = false;
+                chkOcrRemote.Enabled = false;
             }
         }
 
@@ -3430,7 +3468,8 @@ namespace KyungsinLPR
 
         //leess iNova2추가
         private void cmbCameraType_SelectedIndexChanged(object sender, EventArgs e) {
-            env.CameraEnv.iNovaType = cmbCameraType.SelectedIndex + 1;
+            // 카메라별 종류 선택: WGWK는 해당 카메라 CameraSource, iNova1/2는 전역 iNovaType
+            OnCameraTypeChanged();
         }
 
         private void btnStayCommit_Click(object sender, EventArgs e)

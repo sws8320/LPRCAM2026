@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.35319.79
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KyungsinLPRx64", "KukjeLPR\KyungsinLPRx64.csproj", "{259EE19E-D2CE-4C8B-A082-8DCF4624B319}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KyungsinLPRx64", "kyungsinLPR\KyungsinLPRx64.csproj", "{259EE19E-D2CE-4C8B-A082-8DCF4624B319}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SerialDevice", "..\Library\SerialDevice\SerialDevice\SerialDevice.csproj", "{76CB1350-C8B8-4905-BC36-2EBDE64524B3}"
 EndProject

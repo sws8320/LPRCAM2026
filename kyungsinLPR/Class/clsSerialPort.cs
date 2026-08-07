@@ -232,10 +232,22 @@ namespace KyungsinLPR
             return Dingtian;   // 메인 공유박스
         }
 
+        // 열림고정(OpenFix) 중인 게이트 포트(1~8) — 고정 중이면 입차 등 게이트 개방 펄스를 아예 생략(계속 열림 유지).
+        //   RemoteRelayFix(OpenFix a/b)에서 SetGateHold로 set/clear. 장비종류(KJC1000/DINGTIAN/REALSYS) 공통 처리.
+        private readonly bool[] _gateHeld = new bool[9];
+        public void SetGateHold(int port, bool on) { if (port >= 1 && port <= 8) _gateHeld[port] = on; }
+        public bool IsGateHeld(int port) { return port >= 1 && port <= 8 && _gateHeld[port]; }
+
         public void GateOpen(int DevIdx)
         {
             try
             {
+                int gport = Env.CommonEnv.Dio.DioOutPut[DevIdx].Port;
+                if (gport >= 1 && gport <= 8 && _gateHeld[gport])
+                {
+                    Util.Logger.Log(string.Format("열림고정 중 — 게이트 개방 생략 (포트 {0})", gport));
+                    return;
+                }
                 if (IsDingtian())
                 {
                     // 서버모드 다중박스: 카메라별 Dingtian IP가 메인과 다르면 그 박스로 라우팅(8릴레이 초과/분산)

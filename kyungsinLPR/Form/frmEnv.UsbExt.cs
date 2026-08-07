@@ -72,6 +72,12 @@ namespace KyungsinLPR
             int idx = GetCurrentCamIdx();
             bool use = usbCamPanel.IsUsbUsed;
             if (idx == 1) _usbUse1 = use; else _usbUse2 = use;
+            if (use)
+            {
+                // USB 켜면 같은 카메라의 WGWK 해제 (상호배타) + 콤보를 iNova로 표시
+                if (idx == 1) _wgwkUse1 = false; else _wgwkUse2 = false;
+                ApplyWgwkComboForCam(idx);
+            }
             RefreshUsbExtensionForCam(idx);
         }
 
@@ -105,22 +111,38 @@ namespace KyungsinLPR
             }
         }
 
-        /// <summary>저장 시점에 IPCamera1Info / IPCamera2Info 에 USB 상태 반영.</summary>
+        /// <summary>저장 시점에 IPCamera1Info / IPCamera2Info 에 카메라별 소스(USB/WGWK/기본) 통합 반영.</summary>
         private void ApplyUsbStateToEnv()
         {
+            // 카메라별 소스 우선순위: USB > WGWK > 기본(전역 iNova)
             env.CameraEnv.IPCamera1Info.CameraSource =
-                _usbUse1 ? (int)ClsStructure.CameraSourceType.USB : (int)ClsStructure.CameraSourceType.Default;
+                _usbUse1 ? (int)ClsStructure.CameraSourceType.USB
+              : _wgwkUse1 ? (int)ClsStructure.CameraSourceType.WGWK
+              : (int)ClsStructure.CameraSourceType.Default;
             env.CameraEnv.IPCamera1Info.UsbMoniker = _usbMoniker1 ?? "";
             env.CameraEnv.IPCamera1Info.UsbDeviceName = _usbDeviceName1 ?? "";
             env.CameraEnv.IPCamera1Info.UsbResolutionWidth = _usbWidth1;
             env.CameraEnv.IPCamera1Info.UsbResolutionHeight = _usbHeight1;
 
             env.CameraEnv.IPCamera2Info.CameraSource =
-                _usbUse2 ? (int)ClsStructure.CameraSourceType.USB : (int)ClsStructure.CameraSourceType.Default;
+                _usbUse2 ? (int)ClsStructure.CameraSourceType.USB
+              : _wgwkUse2 ? (int)ClsStructure.CameraSourceType.WGWK
+              : (int)ClsStructure.CameraSourceType.Default;
             env.CameraEnv.IPCamera2Info.UsbMoniker = _usbMoniker2 ?? "";
             env.CameraEnv.IPCamera2Info.UsbDeviceName = _usbDeviceName2 ?? "";
             env.CameraEnv.IPCamera2Info.UsbResolutionWidth = _usbWidth2;
             env.CameraEnv.IPCamera2Info.UsbResolutionHeight = _usbHeight2;
+        }
+
+        /// <summary>WGWK 선택 시 해당 카메라의 USB 해제 (상호배타). WgwkExt에서 호출.</summary>
+        private void ClearUsbForCamFromWgwk(int camIdx)
+        {
+            if (camIdx == 1) _usbUse1 = false; else _usbUse2 = false;
+            if (usbCamPanel != null && GetCurrentCamIdx() == camIdx)
+            {
+                usbCamPanel.IsUsbUsed = false;
+                usbCamPanel.SetIdle();
+            }
         }
     }
 }

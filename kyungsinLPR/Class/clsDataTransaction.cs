@@ -15,6 +15,8 @@ namespace KyungsinLPR {
         public DataTable CustDef = new DataTable();
         private DataTable DCList = new DataTable();
         private DataTable WrongDef = new DataTable();
+        private DataTable VisitorDef = new DataTable();   // 방문차량 명단(FC_MASTER.Visitor) — 정기권처럼 주기적 로드
+        private int VisitorMonthlyHours = 0;              // 세대 월 총 주차시간 한도(시간). 0=무제한. GetMaster에서 VisitorPolicy 로드
 
         public DateTime LastGetMst;
 
@@ -184,13 +186,48 @@ namespace KyungsinLPR {
                 query += string.Format("inner join(select acplate1, max(isnull(iModifiedDate, dtregistdate)) iModifiedDate from {0}.dbo.custdef group by ilotarea, acplate1) grp \r\n", frmLprMain.ENV.CommonEnv.DBInfo.MstDB);
                 query += string.Format("on custdef.acPlate1 = grp.acPlate1 and isnull(CUSTDEF.iModifiedDate, dtregistdate) = grp.iModifiedDate\r\n");
                 query += string.Format("left outer join {0}.dbo.AREADEF on custdef.iLotArea = AREADEF.iLotArea\t\n", frmLprMain.ENV.CommonEnv.DBInfo.MstDB);
+                // 그룹 옵션을 정기차량 로드 단계에서 반영 → 이후 전 구간(입차·출차·전광판·차단기)이 자동으로 일반/정기 처리
+                //  · 예외 그룹(clsExceptGroup)      : 선택 그룹은 정기 로드에서 '제외'    → 그 그룹은 일반차량으로 처리
+                //  · 특정 그룹만 정기(SpecialGroup) : 선택 그룹만 정기 로드('만 포함')     → 나머지 그룹은 일반차량으로 처리
+                string custWhere = "";
                 if(frmLprMain.ENV.RegCarControl.Ilotarea)
-                    query += string.Format("where Custdef.iLotarea = '{0}'", frmLprMain.ENV.CommunicationEnv.ParkInfo.No);
+                    custWhere = string.Format("Custdef.iLotarea = '{0}'", frmLprMain.ENV.CommunicationEnv.ParkInfo.No);
+                if(clsExceptGroup.ExceptGrpNo >= 0)
+                    custWhere += (custWhere == "" ? "" : " and ") + string.Format("isnull(Custdef.iGroup,0) <> {0}", clsExceptGroup.ExceptGrpNo);
+                if(SpecialGroup.GroupIdx > 0)
+                    custWhere += (custWhere == "" ? "" : " and ") + string.Format("isnull(Custdef.iGroup,0) = {0}", SpecialGroup.GroupIdx);
+                if(custWhere != "")
+                    query += "where " + custWhere + " \r\n";
                 CustDef = Util.clsMssql.GetTable(MCon, query);
                 Util.Logger.Log(string.Format("정기권 정보 {0}건 취득", CustDef.Rows.Count));
                 DCList = Util.clsMssql.GetTable(MCon, string.Format("select * from {0}.dbo.Customer_DcList", frmLprMain.ENV.CommonEnv.DBInfo.MstDB));
 
                 WrongDef = Util.clsMssql.GetTable(MCon, string.Format("Select * from {0}.dbo.WrongCarDef", frmLprMain.ENV.CommonEnv.DBInfo.MstDB));
+
+                // 방문차량 명단 — 방문자 처리 사용 현장만 로드(미사용 현장은 조회 생략). 사용중(iUseFlg=0)+미만료(dtValidEnd>=오늘). 유효 시작/종료는 매칭 시 재확인.
+                if(frmLprMain.ENV.CommunicationEnv.UseVisitor) {
+                    try {
+                        string vq = string.Format("select iid, iLotArea, isnull(acDong,'') acDong, isnull(acHo,'') acHo, acPlate1, dtValidStart, dtValidEnd from {0}.dbo.Visitor where isnull(iUseFlg,0)=0 and dtValidEnd >= convert(nvarchar(10), getdate(), 121)", frmLprMain.ENV.CommonEnv.DBInfo.MstDB);
+                        if(frmLprMain.ENV.RegCarControl.Ilotarea)
+                            vq += string.Format(" and iLotArea = {0}", frmLprMain.ENV.CommunicationEnv.ParkInfo.No);
+                        VisitorDef = Util.clsMssql.GetTable(MCon, vq);
+                        Util.Logger.Log(string.Format("방문차량 정보 {0}건 취득", VisitorDef.Rows.Count));
+                    } catch(Exception ve) {
+                        Util.Logger.Log(string.Format("방문차량 명단 취득 오류 {0}", ve.Message));
+                    }
+                    // 세대 월 총 주차시간 한도 — ParkingWeb가 VisitorPolicy에 저장. 초과 시 입차 차단(월말까지). 0=무제한.
+                    try {
+                        string mq = string.Format("select isnull(iMonthlyHours,0) mh from {0}.dbo.VisitorPolicy where iLotArea = {1}", frmLprMain.ENV.CommonEnv.DBInfo.MstDB, frmLprMain.ENV.CommunicationEnv.ParkInfo.No);
+                        DataTable mdt = Util.clsMssql.GetTable(MCon, mq);
+                        VisitorMonthlyHours = (mdt != null && mdt.Rows.Count > 0) ? Util.Function.IntTryParse(mdt.Rows[0]["mh"].ToString()) : 0;
+                    } catch(Exception me) {
+                        VisitorMonthlyHours = 0;
+                        Util.Logger.Log(string.Format("방문차 월한도 취득 오류 {0}", me.Message));
+                    }
+                } else {
+                    VisitorDef = new DataTable();
+                    VisitorMonthlyHours = 0;
+                }
             } catch(Exception e) {
                 Util.Logger.Log(string.Format("GetMaster 오류 {0}", e.Message));
                 LastGetMst = LastGetMst.AddMinutes(-9);
@@ -280,6 +317,8 @@ namespace KyungsinLPR {
                 }
 
                 string ControlMent = "";
+                bool isVisitorExit = false;  // 출차 방문차 여부 (전광판 '방문차량' 표시 + VisitorTrns 출차기록용) — 표시/기록 블록과 같은 스코프에 선언
+                DataRow visitorExitRow = null;  // 출차 방문차 DataRow (VisitorTrns 출차 UPDATE용)
                 //Util.Logger.Log("오인식 정보 검색" + Env.CameraEnv.RegModule.ToString());
                 //정기권 조회 오인식 미인식 차량 제외
                 string Number = string.Empty;
@@ -302,6 +341,33 @@ namespace KyungsinLPR {
                     Util.Logger.Log(string.Format("정기 차량 조회 {0} {1} {2}", Env.CommunicationEnv.RegCorrection, CarNo, Number));
                     RegedInfo = FindRegedCar(Env.CommunicationEnv.RegCorrection, CarNo, Number);
                     if(RegedInfo == null) RegedInfo = new DataRow[0];
+
+                    // [방문차량] 입차만 LPR이 직접 처리(전광판 "방문차량"+차번 / 게이트 / 입차기록 TCKTTRNS+VisitorTrns).
+                    //   출차는 인터셉트하지 않고 정상흐름으로 무인정산기(ParkingWeb)에 전달 → 무인정산기가 방문차 인식→무료출차 처리.
+                    //   (정기차 아닐 때만, 미인식 제외)
+                    if(Env.CommunicationEnv.UseVisitor && Type.Equals((int)ClsStructure.InoutType.입구용) && RegedInfo.Length == 0 && !CarNo.Equals("No_Detection")) {
+                        DataRow[] vinfo = FindVisitorCar(Env.CommunicationEnv.RegCorrection, CarNo, Number);
+                        if(vinfo != null && vinfo.Length > 0) {
+                            string vres = ProcessVisitor(Type, Env, CamIdx, CarNo, Image, ProcTime, LprInfo, vinfo[0], Rtn);
+                            if(vres != null) return vres;   // 방문차로 처리 완료
+                            // vres==null: 방문차 월 이용시간 초과 → 아래 일반차량 입출차 흐름으로 폴백 처리
+                        }
+                    }
+
+                    // [방문차량] 출차는 무인정산기(ParkingWeb)가 처리하지만, 로컬 전광판에 '일반차량'이 먼저 떴다가
+                    //   무인정산기의 '방문차량'으로 바뀌는 깜빡임 발생 → 출차 방문차면 로컬 전광판도 처음부터
+                    //   '방문차량'으로 표시(무인정산기와 동일 문구/색)해 깜빡임 제거. 정산 전달/게이트 흐름은 그대로.
+                    if(Env.CommunicationEnv.UseVisitor && Type.Equals((int)ClsStructure.InoutType.출구용) && RegedInfo.Length == 0 && !CarNo.Equals("No_Detection")) {
+                        DataRow[] vexit = FindVisitorCar(Env.CommunicationEnv.RegCorrection, CarNo, Number);
+                        isVisitorExit = (vexit != null && vexit.Length > 0);
+                        if(isVisitorExit) visitorExitRow = vexit[0];
+                        else {
+                            // 등록 만료/삭제됐어도 미출차 방문차 입차기록 있으면 방문차 출차로 처리(전광판 '방문차량' + VisitorTrns 출차)
+                            DataRow openV = FindOpenVisitorTrns(CarNo);
+                            if(openV != null) { isVisitorExit = true; visitorExitRow = openV; }
+                        }
+                    }
+
                     Env.RegCarControl.iControlType = 0;
                     // 그룹 제한은 기본적으로 입구용에서 적용되며, UseExitGroupGate가 켜져 있으면 출구용에도 적용된다.
                     bool applyGroupGate = Type.Equals((int)ClsStructure.InoutType.입구용) ||
@@ -693,7 +759,18 @@ namespace KyungsinLPR {
                 }
                 Util.Logger.Log("미등록 차량 무발권 차단기 개방 " + RegedCar.ToString());
                 if(!RegedCar[CamIdx]) {
-                    // 무발권 차단기 개방 
+                    // [방문차량 출차] 전광판을 차단기(릴레이)보다 먼저 출력 — 차단기 열고 뒤늦게 표시되던 지연감 제거(입차 ProcessVisitor와 동일 취지).
+                    //   아래 전광판 블록(DisPlay.Use)의 isVisitorExit 분기는 재출력 없이 DisPlayTime만 갱신해 return 타이머(~5초) 유지.
+                    if(isVisitorExit && Env.CommunicationEnv.DisPlay[CamIdx].Use && !frmLprMain.isFixed) {
+                        try {
+                            if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use)))
+                                NetDev.SendMsg("방문차량", clsFunction.GetColor8Int("녹색"), CarNoSpace(CarNo), clsFunction.GetColor8Int("노랑"));
+                            else
+                                SerialDev.DisPlayMent(CamIdx, "방문차량", "녹색", CarNoSpace(CarNo), "노랑");
+                            Util.Logger.Log(string.Format("방문차량(출차) 전광판 선출력 {0} {1}", CamIdx == 0 ? "CH1" : "CH2", CarNo));
+                        } catch(Exception ve) { Util.Logger.Log("방문차 출차 전광판 선출력 오류 " + ve.Message); }
+                    }
+                    // 무발권 차단기 개방
                     //Util.Logger.Log(string.Format("무발권 처리 {0}", LprInfo.FreePass.ToString()));
                     //Rtn += string.Format("무발권 처리 {0} {1} ", LprInfo.FreePass.ToString(), '\n');
                     Util.Logger.Log(string.Format("미인식 처리 옵션 {0}", Env.CommunicationEnv.Nodetection_Open.ToString()));
@@ -733,7 +810,11 @@ namespace KyungsinLPR {
                     }
                     if(Env.CommunicationEnv.DisPlay[CamIdx].Use) {
                         try {
-                            if(blInfo.Apply || BlackOutDisplay) {
+                            if(isVisitorExit) {
+                                // 출차 방문차 — 위 차단기(릴레이) 前에서 이미 '방문차량' 선출력함. 여기선 재출력 없이
+                                //   일반차량 표시만 건너뜀. 아래 DisPlayTime=Now 갱신으로 return 타이머(~5초) 유지.
+                                Rtn += string.Format("방문차량(출차) 전광판 (선출력됨) {0} {1}", CarNo, '\n');
+                            } else if(blInfo.Apply || BlackOutDisplay) {
                                 Rtn += string.Format("블랙 리스트 문구 전광판 출력 {0} {1}", blInfo.Ment1, CarNo, '\n');
                                 //SerialDev.DisPlayMent(CamIdx, blInfo.Ment1, blInfo.Color1, blInfo.Ment2, blInfo.Color2);
                                 if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use))) {
@@ -1011,6 +1092,14 @@ namespace KyungsinLPR {
                                         Util.Logger.Query(item.Query);
                                         //QList.Add(item);
                                         Util.clsMssql.ExecQuery(TCon, item.Query);
+                                        // 방문차량 — TCKTTRNS 출차와 함께 VisitorTrns도 출차 처리(미출차행 UPDATE + 주차시간 계산).
+                                        //   LPR 단독(출구 무인정산기 없음)에서 '일반차량 입출차내역 기록' 옵션 켜졌을 때 방문차 주차시간 누락 방지.
+                                        if(isVisitorExit && visitorExitRow != null) {
+                                            Util.Logger.Log("방문 차량 출차 내역 기록 (VisitorTrns)");
+                                            item.Query = clsQuery.SetExitVisitorTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, visitorExitRow, CarNo, Image);
+                                            Util.Logger.Query(item.Query);
+                                            Util.clsMssql.ExecQuery(TCon, item.Query);
+                                        }
                                     }
                                 }
                                 if(LprInfo.LprOpt.Normal_Counter) {
@@ -1078,6 +1167,8 @@ namespace KyungsinLPR {
                         color = Color.Red;
                     else if(RegedCar[CamIdx])
                         color = Color.Blue;
+                    else if(isVisitorExit)   // 방문차 출차 — 입차 때처럼 인식결과 녹색 표시
+                        color = Color.Green;
                     lbl.Invoke((MethodInvoker)(() => lbl.ForeColor = color));
                     lbl.Invoke((MethodInvoker)(() => lbl.Text = string.Format("인식결과 : {0}", CarNo)));
                 } else {
@@ -1123,6 +1214,143 @@ namespace KyungsinLPR {
                 Util.Logger.Query(string.Format("FindRegedCar_Error : {0}", FindRegedCar_Error.Message));
             }
             return RTN;
+        }
+
+        // 방문차량 명단(VisitorDef)에서 차량번호로 유효한 방문차 조회 — 정기차 FindRegedCar 미러. 유효기간(시작~종료) 재확인.
+        private DataRow[] FindVisitorCar(int RegCorrection, string CarNo, string Number) {
+            try {
+                if(VisitorDef == null || VisitorDef.Rows.Count == 0) return new DataRow[0];
+                string car = CarNo.Replace("'", "''");
+                DataRow[] rtn = VisitorDef.Select(string.Format("acPlate1 = '{0}'", car));
+                if(rtn.Length == 0 && !string.IsNullOrEmpty(Number))
+                    rtn = VisitorDef.Select(string.Format("acPlate1 like '%{0}'", Number));
+                if(rtn.Length == 0) return rtn;
+                List<DataRow> valid = new List<DataRow>();
+                DateTime now = DateTime.Now;
+                foreach(DataRow r in rtn) {
+                    DateTime vs, ve;
+                    bool okS = DateTime.TryParse(r["dtValidStart"].ToString(), out vs);
+                    bool okE = DateTime.TryParse(r["dtValidEnd"].ToString(), out ve);
+                    if(okS && okE && now >= vs && now <= ve) valid.Add(r);
+                }
+                return valid.ToArray();
+            } catch(Exception ex) {
+                Util.Logger.Query(string.Format("FindVisitorCar_Error : {0}", ex.Message));
+                return new DataRow[0];
+            }
+        }
+
+        // 방문차량 처리 — 정기차 미러: "방문차량"+차번 전광판 + 차단기 + TCKTTRNS(일반흐름 재사용)/VisitorTrns/FC_STAY 기록. 자체 완결 후 즉시 반환.
+        // 세대(동/호)의 이번 달 누적 주차시간(분) — VisitorTrns.acCarStayHours(HHH:MM) 합계. dtInDate 기준 당월, 출차완료건만.
+        private int GetVisitorMonthlyUsedMinutes(string lotArea, string dong, string ho) {
+            try {
+                string trns = frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb;
+                string d = (dong ?? "").Replace("'", "''");
+                string h = (ho ?? "").Replace("'", "''");
+                string sql = string.Format(
+                    "select isnull(sum(case when charindex(':', acCarStayHours) > 0 then " +
+                    "cast(substring(acCarStayHours, 1, charindex(':', acCarStayHours)-1) as int)*60 + " +
+                    "cast(substring(acCarStayHours, charindex(':', acCarStayHours)+1, 2) as int) else 0 end), 0) usedmin " +
+                    "from {0}.dbo.VisitorTrns where iLotArea = {1} and acDong = N'{2}' and acHo = N'{3}' " +
+                    "and dtInDate >= dateadd(month, datediff(month, 0, getdate()), 0) and acCarStayHours is not null",
+                    trns, lotArea, d, h);
+                DataTable dt = Util.clsMssql.GetTable(TCon, sql);
+                if(dt != null && dt.Rows.Count > 0) return Util.Function.IntTryParse(dt.Rows[0]["usedmin"].ToString());
+            } catch(Exception ex) { Util.Logger.Log("방문차 월사용시간 조회 오류 " + ex.Message); }
+            return 0;
+        }
+
+        // 미출차 방문차 입차기록(VisitorTrns dtOutDate NULL) 조회 — 등록 만료/삭제됐어도 입차했으면 방문차 출차로 처리.
+        //   반환 행: iid(=iVisitorId), acDong, acHo, acPlate1 (SetExitVisitorTrns V 인자로 사용). 없으면 null.
+        private DataRow FindOpenVisitorTrns(string carNo) {
+            try {
+                string trns = frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb;
+                string plate = (carNo ?? "").Replace("'", "''");
+                string where = string.Format("acPlate1 = N'{0}' and dtOutDate is null", plate);
+                if(frmLprMain.ENV.RegCarControl.Ilotarea)
+                    where += string.Format(" and iLotArea = {0}", frmLprMain.ENV.CommunicationEnv.ParkInfo.No);
+                string sql = string.Format("select top 1 isnull(iVisitorId,0) iid, isnull(acDong,'') acDong, isnull(acHo,'') acHo, acPlate1 " +
+                    "from {0}.dbo.VisitorTrns where {1} order by dtInDate desc", trns, where);
+                DataTable dt = Util.clsMssql.GetTable(TCon, sql);
+                if(dt != null && dt.Rows.Count > 0) return dt.Rows[0];
+            } catch(Exception ex) { Util.Logger.Log("미출차 방문차 조회 오류 " + ex.Message); }
+            return null;
+        }
+
+        private string ProcessVisitor(int Type, ClsStructure.EnvStruct Env, int CamIdx, string CarNo, string Image, DateTime ProcTime, ClsStructure.Lpr_Info LprInfo, DataRow V, string Rtn) {
+            try {
+                bool ent = Type.Equals((int)ClsStructure.InoutType.입구용);
+                Util.Logger.Log(string.Format("방문차량 처리 {0} 동{1} 호{2} ({3})", CarNo, V["acDong"], V["acHo"], ent ? "입차" : "출차"));
+                Rtn += string.Format("방문차량 {0} 동{1} 호{2} {3}", CarNo, V["acDong"], V["acHo"], '\n');
+                bool recog = !CarNo.Equals("No_Detection");
+
+                // [월 한도] 입차 시 세대 이번달 누적 주차시간이 한도 초과면 → 방문차(무료) 처리하지 않고 일반차량으로 폴백(null 반환).
+                //   호출부가 일반차량 입출차 흐름으로 처리(전광판/게이트/TCKTTRNS 등은 '일반차량 입출차내역 기록' 옵션에 따름). 월 경계로 다음달 자동 리셋.
+                if(ent && VisitorMonthlyHours > 0) {
+                    int usedMin = GetVisitorMonthlyUsedMinutes(V["iLotArea"].ToString(), V["acDong"].ToString(), V["acHo"].ToString());
+                    if(usedMin >= VisitorMonthlyHours * 60) {
+                        Util.Logger.Log(string.Format("방문차 월 이용시간 초과 → 일반차량으로 처리 {0} 동{1} 호{2} (사용 {3}분 / 한도 {4}시간)", CarNo, V["acDong"], V["acHo"], usedMin, VisitorMonthlyHours));
+                        return null;   // 방문차 미처리 → 일반차량 입출차 흐름으로 폴백
+                    }
+                }
+
+                // 인식결과 라벨에 차번 표시 (방문차는 early-return이라 정상흐름 라벨갱신(1102)을 못 타므로 직접 갱신). 방문차=초록.
+                try {
+                    if(CamIdx == 0 || CamIdx == 1) {
+                        Label vlbl = (CamIdx == 0) ? frmLprMain.Main.lblCam1RegResult : frmLprMain.Main.lblCam2RegResult;
+                        vlbl.Invoke((MethodInvoker)(() => vlbl.ForeColor = Color.Green));
+                        vlbl.Invoke((MethodInvoker)(() => vlbl.Text = string.Format("인식결과 : {0}", CarNo)));
+                    }
+                } catch(Exception le) { Util.Logger.Log("방문차 인식결과 표시 오류 " + le.Message); }
+
+                // 전광판·차단기를 DB기록보다 먼저 처리 — 일반/정기차량과 동일 순서로 응답 지연감 제거
+                // (방문차는 DB기록 5개가 앞서 있어 릴레이·전광판이 늦게 반응하던 문제 수정)
+                try {
+                    if(Env.CommunicationEnv.DisPlay[CamIdx].Use && !frmLprMain.isFixed) {
+                        string ment = "방문차량";
+                        string c1 = Env.CommunicationEnv.DisPlay[CamIdx].Period1Color;
+                        string c2 = Env.CommunicationEnv.DisPlay[CamIdx].Period2Color;
+                        if(NetDev != null && ((CamIdx == 0 && Env.CommunicationEnv.DisPlay[0].Net.Use) || (CamIdx == 1 && Env.CommunicationEnv.DisPlay[1].Net.Use)))
+                            NetDev.SendMsg(ment, clsFunction.GetColor8Int(c1), CarNoSpace(CarNo), clsFunction.GetColor8Int(c2));
+                        else
+                            SerialDev.DisPlayMent(CamIdx, ment, c1, CarNoSpace(CarNo), c2);
+                        Util.Logger.Log(string.Format("방문차량 전광판 출력 {0} {1} {2}", CamIdx == 0 ? "CH1" : "CH2", ment, CarNo));
+                        // 방문차 입차도 ~5초 후 대기복귀 — 일반/정기차와 동일하게 DisPlayTime 갱신(누락 시 '방문차량'이 계속 표시됨)
+                        if(CamIdx == 0) {
+                            if(Env.CommunicationEnv.DisPlay[CamIdx].Net.Use) frmLprMain.NetDisPlay1.DisPlayTime = DateTime.Now;
+                            else frmLprMain.FirstDisPlayReturn.DisPlayTime = DateTime.Now;
+                        } else {
+                            if(Env.CommunicationEnv.DisPlay[CamIdx].Net.Use) frmLprMain.NetDisPlay2.DisPlayTime = DateTime.Now;
+                            else frmLprMain.SecondDisPlayReturn.DisPlayTime = DateTime.Now;
+                        }
+                    }
+                } catch(Exception de) { Util.Logger.Log("방문차 전광판 오류 " + de.Message); }
+
+                try { GateOpen(CamIdx); } catch(Exception ge) { Util.Logger.Log("방문차 차단기 개방 오류 " + ge.Message); }
+
+                if(ent) {
+                    try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetEntranceLprTrns(ProcTime, Env.CommunicationEnv.ParkInfo, true, CarNo, Image, recog, LprInfo.ChNo)); } catch(Exception le) { Util.Logger.Log("방문차 입차 LprTrns 오류 " + le.Message); }
+                    if(LprInfo.LprOpt.Normal_Tckttrns)
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetEntranceTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image, "0", 0)); } catch(Exception te) { Util.Logger.Log("방문차 입차 TcktTrns 오류 " + te.Message); }
+                    try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetEntranceVisitorTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, V, CarNo, Image)); } catch(Exception vex) { Util.Logger.Log("방문차 입차 VisitorTrns 오류 " + vex.Message); }
+                    if(LprInfo.LprOpt.Normal_Counter) {
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetEntranceFcStay(Env.CommunicationEnv.ParkInfo)); } catch { }
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetEntranceFcCountTrns(ProcTime, Env.CommunicationEnv.ParkInfo)); } catch { }
+                    }
+                } else {
+                    try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetExitLprTrns(ProcTime, Env.CommunicationEnv.ParkInfo, true, CarNo, Image, recog, LprInfo.ChNo)); } catch(Exception le) { Util.Logger.Log("방문차 출차 LprTrns 오류 " + le.Message); }
+                    if(LprInfo.LprOpt.Normal_Tckttrns)
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetExitTcktTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, CarNo, Image)); } catch(Exception te) { Util.Logger.Log("방문차 출차 TcktTrns 오류 " + te.Message); }
+                    try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetExitVisitorTrns(ProcTime, Env.CommunicationEnv.ParkInfo, LprInfo, V, CarNo, Image)); } catch(Exception vex) { Util.Logger.Log("방문차 출차 VisitorTrns 오류 " + vex.Message); }
+                    if(LprInfo.LprOpt.Normal_Counter) {
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetExitFcStay(Env.CommunicationEnv.ParkInfo)); } catch { }
+                        try { Util.clsMssql.ExecQuery(TCon, clsQuery.SetExitFcCountTrns(ProcTime, Env.CommunicationEnv.ParkInfo)); } catch { }
+                    }
+                }
+            } catch(Exception ex) {
+                Util.Logger.Log("방문차량 처리 오류 " + ex.Message);
+            }
+            return Rtn;
         }
 
         public SqlConnection Get_MCon() {

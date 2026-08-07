@@ -252,6 +252,35 @@ namespace KyungsinLPR
             return Sql;
         }
 
+        // 방문차량 입차 기록 — FC_TRNS.VisitorTrns (동/호/주차시간, 종량제 집계용). 입차 시 항상 기록(중복 방지 없음).
+        public static string SetEntranceVisitorTrns(DateTime ProcTime, ClsStructure.Park_Info ParkInfo, ClsStructure.Lpr_Info LprInfo, System.Data.DataRow V, String Carno, String EntrancePic)
+        {
+            string trns = frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb;
+            string plate = Carno.Replace("'", "''");
+            string dong = V["acDong"].ToString().Replace("'", "''");
+            string ho = V["acHo"].ToString().Replace("'", "''");
+            string Sql = string.Format("INSERT INTO {0}.dbo.VisitorTrns (iLotArea, iVisitorId, acDong, acHo, acPlate1, dtInDate, iInEqpm, acEntrancePicName, dtRegDate) VALUES ", trns);
+            Sql += string.Format("({0}, {1}, N'{2}', N'{3}', N'{4}', '{5}', {6}, N'{7}', getdate())", ParkInfo.No, V["iid"], dong, ho, plate, ProcTime.ToString("yyyy-MM-dd HH:mm:ss"), LprInfo.EqpmNo, EntrancePic);
+            return Sql;
+        }
+
+        // 방문차량 출차 기록 — 미출차 VisitorTrns 를 출차 UPDATE(주차시간 자동계산). 입차기록 없으면 입출차 동시 기록.
+        public static string SetExitVisitorTrns(DateTime ProcTime, ClsStructure.Park_Info ParkInfo, ClsStructure.Lpr_Info LprInfo, System.Data.DataRow V, String Carno, String ExitPic)
+        {
+            string trns = frmLprMain.ENV.CommonEnv.DBInfo.TrnsDb;
+            string plate = Carno.Replace("'", "''");
+            string dong = V["acDong"].ToString().Replace("'", "''");
+            string ho = V["acHo"].ToString().Replace("'", "''");
+            string exit = ProcTime.ToString("yyyy-MM-dd HH:mm:ss");
+            string Sql = "declare @iid int \r\n";
+            Sql += string.Format("select @iid = max(iid) from {0}.dbo.VisitorTrns where iLotArea = {1} and acPlate1 = N'{2}' and dtOutDate is null \r\n", trns, ParkInfo.No, plate);
+            Sql += "if (@iid is null) \r\n";
+            Sql += string.Format("  INSERT INTO {0}.dbo.VisitorTrns (iLotArea, iVisitorId, acDong, acHo, acPlate1, dtInDate, dtOutDate, acCarStayHours, iOutEqpm, acGoOutPicName, dtRegDate) VALUES ({1}, {2}, N'{3}', N'{4}', N'{5}', '{6}', '{6}', '000:00', {7}, N'{8}', getdate()) \r\n", trns, ParkInfo.No, V["iid"], dong, ho, plate, exit, LprInfo.EqpmNo, ExitPic);
+            Sql += "else \r\n";
+            Sql += string.Format("  UPDATE {0}.dbo.VisitorTrns SET dtOutDate = '{1}', iOutEqpm = {2}, acGoOutPicName = N'{3}', acCarStayHours = substring(convert(nvarchar(16), '{1}' - dtInDate, 121), 12, 5) WHERE iid = @iid \r\n", trns, exit, LprInfo.EqpmNo, ExitPic);
+            return Sql;
+        }
+
         public static string SetEntranceLprTrns(DateTime ProcTime, ClsStructure.Park_Info ParkInfo, bool Reged, String Carno, String EntrancePic, bool Recognition)
         {
             String Sql = string.Empty;

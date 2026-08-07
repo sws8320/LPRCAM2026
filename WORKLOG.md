@@ -20,6 +20,71 @@
 
 ---
 
+## 정기차량 그룹 옵션 = 정기차량 로드에서 필터 처리 (2026-08-06)
+
+환경설정의 두 그룹 옵션을 **개별 입출차 로직 패치가 아니라 정기차량 로드(`GetMaster`) 단계에서 필터**로 해결.
+근거: `GetMaster()`가 CUSTDEF 전체를 `CustDef` 캐시로 로드(clsDataTransaction.cs:191) → `FindRegedCar`가 여기서만 조회 →
+빠지면 `RegedCar=false` → 입차(TcktTrns)·출차(요금계산 else 분기)·전광판(일반)·차단기(Normal_Gate) **전부 자동 일반처리**.
+
+- **예외 그룹**(`clsExceptGroup`, Setting.ini [PASSCAR] EXCEPT, region "차단기 개방 예외 정기차량 그룹"):
+  선택 그룹은 로드에서 **제외** → 그 그룹만 일반차량 처리. `and isnull(Custdef.iGroup,0) <> {ExceptGrpNo}` (ExceptGrpNo>=0일 때)
+- **특정 그룹만 정기**(`SpecialGroup`, Setting.ini [SpecialGroup] Idx, region "특정 정기차량 그룹만 정기권 처리"):
+  선택 그룹만 로드 → 나머지 일반. `and isnull(Custdef.iGroup,0) = {GroupIdx}` (GroupIdx>0일 때)
+- `clsExceptGroup.Set_Except_Group`에 캐시 즉시 갱신(`Except_GrpNo=...`) 추가 → 저장 후 **재시작 없이** 다음 로드 반영(기존엔 INI만 써서 재시작 필요).
+- 기존 입출차 로직의 산발 ExceptGroup 체크(598/875/887)·SpecialGroup 분기(642~661)는 이제 트리거 안 됨(무해). 특히 **기존 버그**(예외그룹이 입차=일반 TcktTrns인데 출차=정기 PassTrns로 빠져 요금 미부과+입차 미마감)도 함께 해결.
+- 차단기 개방은 입출차 정보 연동 처리 옵션(Normal_Gate 등)이 자동 처리(line 776 확인). 빌드: x64 Release 성공(PE 0x8664 검증), SETUP\UPDATE + 현장 UPDATE 자동복사.
+- ⚠️부작용: 로드 제외된 차량은 LprTrns에 '미등록'으로 기록(고객명 없음) — 일반 처리 취지엔 부합. Normal_Gate 꺼진 정기전용 현장은 개방 옵션 확인 필요.
+
+## CAPTURE 소켓명령 카메라2 지원 (2026-08-07)
+
+외부 프로그램이 입차서버(30000)로 `STX+CAPTURE+ETX` 보내면 카메라1만 인식되던 것을 카메라2까지 확장.
+`LprEntSvrProcessPackets`(frmLprMain.cs:5245) 핸들러: `CAPTURE`|`CAPTURE1`→카메라1(Capture1=true, 기존 호환), `CAPTURE2`→카메라2(Capture2=true, dtRegList2.Clear, LastLoopTime2). 바이트: CAPTURE=`02..45 03`(9), CAPTURE1=`02..45 31 03`(10), CAPTURE2=`02..45 32 03`(10). 완전일치(==) 판정 유지.
+⚠️인식결과 검출메시지는 각 카메라 입/출구 설정에 따라 30000(입구)/40000(출구)로 나감(SendData 옵션 ON 필요) — 아키텍처상 CAPTURE 온 소켓으로 직접 응답하는 구조 아님. 외부연동가이드=`D:\LPR-소스\LPRCAM\LPR_소켓명령_연동가이드.txt`(소켓 전체 명령: CAPTURE/GATEOPEN/MNG GateOpen·GateClose·OpenFix/DISPLAY/keepalive). x64 Release 빌드/검증.
+
+## 서버캠(ServerCamEnv) 정산설정 적용·로그 = 서버모드일 때만 (2026-08-06)
+
+기본 2CH 모드에서도 기동 로그에 `[ServerCamEnv3~15] 정산설정 적용...`이 남던 문제. 원인=`clsServerCamEnv.Load()`가
+ServerMode 무관하게 `for(i=2..camCount) ApplyCam(i)` 실행. **수정: `ServerMode` 읽은 뒤 `if(!ServerMode) return;`** 로
+서버캠 적용/로그를 서버모드에서만. (ApplyCardDisplay(0/1)도 이 뒤라 서버모드 전용 유지 — 기존 `if(ServerMode)` 가드 제거하고 return으로 통일.)
+진단근거: 2CH 로그에 `[ServerCamEnv1/2] 카드 전광판`(ApplyCardDisplay, ServerMode 가드)이 안 뜸 = ServerMode=false 확정, 3~15 루프만 무가드였음.
+서버캠은 서버모드에서만 쓰이므로(cam2~14) 2CH에서 미적용 무해(GetLpr는 idx 0/1은 Lpr1/2 직접반환, idx>=2는 사용 시 지연적용). x64 Release 빌드/검증.
+
+## WGWK-A05D 카메라 추가 (2026-06-25)
+
+환경설정 → 카메라설정 → **카메라 종류**에 `iNova1`/`iNova2` 외에 **`WGWK-A05D`** 추가.
+SDK(AJNetSDK libNetSdk/AjPlayer)는 **x86 전용**이라 x64 빌드와 충돌 → 네이티브 P/Invoke 대신
+**HTTP API `GET /HAPI/V1.0/snapshot.cgi?stream=&username=&password=`** 폴링으로 JPEG 스냅샷 수신.
+비밀번호는 **MD5 16진수**로 전송(예: 123456 → e10adc3949ba59abbe56e057f20f883e). 영상표시·캡처 모두 snapshot 폴링.
+기존 iNova/USB 동작은 **추가 분기**로만 처리해 무영향(검증 완료, x64 빌드 에러 0, 운영 배포 완료).
+
+### 동작 방식 (USB 통합 패턴 미러링)
+- `CameraSourceType.WGWK = 4`. 전역 콤보 선택 시 `iNovaType=4`. `GetCamSource`가 Default면 iNovaType 반환 → `IsWgwkCam` 판정
+- `StartCamera()`: iNovaType==4면 WGWK 채널 그랩루프 시작. 채널별 USB(CameraSource=3) 개별 지정은 그대로 우선
+- 그랩루프 `GrabLoop{1,2}_Wgwk`: `m_camera{1,2}_wgwk.GetImage(1000)` → SetBitmap + (캡처시) SaveLastImage(JPEG 무손실) → CoreLogic/OptionK.Reg
+- 노출 제어 스레드/ watchdog 재기동 조건에 WGWK도 USB처럼 제외(자동노출)
+
+### 신규 파일
+- `Class/WGWK/WgwkCamera.cs` — HttpWebRequest 동기 GET, 최신 JPEG 캐시, IPCamera/USBCamera 동일 시그니처(ConnectStreamPort/GetImage/SaveLastImage/IsStreamPortConnected/ResetCamera)
+- `Form/frmLprMain.Wgwk.cs` — `IsWgwkCam`/`StartCamera_Wgwk`/`GrabLoop{1,2}_Wgwk`
+- `Form/frmEnv.WgwkExt.cs` — "WGWK-A05D 접속정보" 그룹 **동적 생성**(Designer 미수정, tabCam 423,60). 카메라1·2별 계정/비번/HTTP포트/스트림 입력(IP는 기존 카메라 IP 재사용)
+
+### 수정 파일
+- `Class/ClsStructure.cs` — enum `WGWK=4` + 구조체 `WgwkPort/WgwkUser/WgwkPass/WgwkStream`
+- `Form/frmLprMain.cs` — 멤버 `m_camera{1,2}_wgwk`, StartGrabLoop{1,2}/StartCamera/StartCamera_iNova{1,2}/StopCamera/노출스레드/ImageSaveTermCheck에 WGWK 분기
+- `Class/clsFunction.cs` — `[CAMERA]` `cam{1,2}wgwk{port,user,pass,stream}` 읽기/쓰기
+- `Form/frmEnv.cs`(+Designer) — 콤보에 "WGWK-A05D" 항목 + iNovaType 매핑(idx2↔4), Init/Refresh/Apply hook 4곳
+- `KyungsinLPRx64.csproj` — 신규 3파일 등록 (**메인 x64만**. 타 csproj는 USB 파일도 미등록 상태라 동기화 밖)
+
+### INI 기본값 (CameraSetting.ini [CAMERA])
+- `cam{1,2}wgwkuser`(admin) / `cam{1,2}wgwkpass`(123456) / `cam{1,2}wgwkport`(80) / `cam{1,2}wgwkstream`(1=메인)
+
+### 미해결/후속 후보
+- [ ] 실제 WGWK-A05D 장비 연동 현장 테스트(인식률·지연·폴링부하)
+- [ ] 서버모드 카드3~15에서 WGWK 소스 선택(현재 서버캠은 iNova2 고정)
+- [ ] 부드러운 라이브 영상 필요 시 RTSP(`rtsp://ip:554/stream0`) 디코딩 경로(현재는 snapshot 폴링)
+
+---
+
 ## 진행 중 기능 (2026-06-04 ~ 2026-06-11)
 
 ### USB 카메라 2대 영상 표시·인식 통합
@@ -228,3 +293,26 @@ KJC1000 / REALSYS 시리얼 보드와 별개로 이더넷 릴레이 보드 지�
 - [ ] frmEnv.Designer.cs를 직접 수정해 DINGTIAN GroupBox를 디자이너에 보이도록 (현재는 런타임 동적 생성 → VS 디자이너에서는 안 보임. 실행은 정상)
 - [ ] 폴링 주기를 환경설정에서 사용자가 변경할 수 있게 INI 노출
 - [ ] DINGTIAN 보드 다채널(16ch/32ch) 모델 지원 — `LastInput[8]` 배열 크기 확장
+
+---
+
+## 2026-07-10 방문차량(Visitor) 입출차 처리 추가
+
+정기차량(CustDef)을 GetMaster로 주기 로드하는 것과 동일하게, 방문차 명단(FC_MASTER.Visitor)도 로드해 LPR 레벨에서 자체 처리.
+
+**변경 파일 (신규파일 없음 → csproj 수정 불필요)**
+- `Class/clsDataTransaction.cs`:
+  - `VisitorDef` DataTable 필드 추가, `GetMaster()`에서 `select ... from FC_MASTER.Visitor where iUseFlg=0 and dtValidEnd>=오늘` 로드(정기권과 동일 방식, Ilotarea 옵션 반영)
+  - `FindVisitorCar(RegCorrection, CarNo, Number)` — FindRegedCar 미러(정확일치→부분(4/6자리) + 유효기간 재확인)
+  - `DataProcess`: FindRegedCar 직후 인터셉트 — 정기차 아니고 방문차 명단에 있으면 `ProcessVisitor` 호출 후 즉시 return (기존 일반/정기/미등록 흐름 무손상, 정기차 우선)
+  - `ProcessVisitor()` — 전광판 "방문차량"+차번(정기색상 재사용, Net/Serial) + GateOpen + 기록: 입차/출차별 LprTrns + TCKTTRNS(일반흐름 재사용, LprOpt.Normal_* 존중) + VisitorTrns + FC_STAY/FC_COUNT
+- `Class/clsQuery.cs`: `SetEntranceVisitorTrns` / `SetExitVisitorTrns` (FC_TRNS.VisitorTrns 입/출차, 주차시간 자동계산, 미출차 중복 방지)
+
+**저장 정책**: TCKTTRNS(입출차현황/재실 통합) + VisitorTrns(동/호/주차시간, 종량제용) 둘 다.
+**조율**: ParkingWeb `Visitor.AutoInOut=false`(LPR 직접 처리 → 이중처리 방지).
+**검증**: x64 Debug 빌드 성공. VisitorTrns 입출차 SQL DB 직접 실행 → 주차시간 자동계산 확인. **※ 실장비(카메라→DataProcess→전광판/게이트) 현장 테스트 미완 — 테스트 방문차 등록 후 실차 입출차로 확인 필요.**
+
+### 2026-07-10 (후속) 방문차 입차 전용으로 변경 + 인식결과 표시
+- **인터셉트 입차(입구용) 전용**: 출차는 인터셉트 안 하고 정상흐름으로 무인정산기(ParkingWeb)에 전달 → 무인정산기가 방문차 인식→무료출차. (LPR 출차 직접처리와 무인정산기 이중처리 방지). ProcessVisitor 출차분기는 dead(향후 LPR제어 출차 현장용 보존).
+- **인식결과 라벨**: 방문차 early-return이 정상 라벨갱신(1102)을 못 타서 차번 미표시 → ProcessVisitor에서 lblCam1/2RegResult 직접 갱신(방문=초록).
+- 재빌드 성공. ParkingWeb: SearchEntryCar 방문 인식(0원)+방문 무료출차 블록(VisitorExit+KioskFreeExit+게이트) 추가.

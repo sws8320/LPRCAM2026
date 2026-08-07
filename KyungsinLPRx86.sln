@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29025.244
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KyungsinLPRx86", "KukjeLPR\KyungsinLPRx86.csproj", "{3D1291E5-9307-4ECD-952F-DF5C94A99EBC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KyungsinLPRx86", "kyungsinLPR\KyungsinLPRx86.csproj", "{3D1291E5-9307-4ECD-952F-DF5C94A99EBC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Util", "..\..\Library\Util\Util.csproj", "{29B31F1C-4D31-421D-BA9E-81D531D38E26}"
 EndProject

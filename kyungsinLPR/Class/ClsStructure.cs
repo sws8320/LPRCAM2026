@@ -44,6 +44,7 @@ namespace KyungsinLPR
             public int RegCorrection;
             public SaveImage ImageSave;
             public bool Nodetection_Open;
+            public bool UseVisitor;              // 방문자 처리 사용 (현장 단위 ON/OFF) — 켜진 현장만 방문차 인식/기록/차단
             public Lpr_Info Lpr1Info;
             public Lpr_Info Lpr2Info;
             public Sock_Info[] ClientTarget;
@@ -70,6 +71,7 @@ namespace KyungsinLPR
             public bool bRegCarType;
             public List<SmallCarRate> RegCarRate;
             public int RecogMode; // 0=스트로브(SSEngine), 1=동영상(FAVEngine)
+            public int EvoVersion; // Evo 인식엔진 버전: 6 또는 7 (기본 7). 현장 옛 6버전 SDK 호환용.
         }
 
         public struct IPCamera_Basic_Setting
@@ -99,6 +101,12 @@ namespace KyungsinLPR
             public string UsbDeviceName; // 표시용 이름 (예: "OBSBOT Tiny 4K")
             public int UsbResolutionWidth;
             public int UsbResolutionHeight;
+            // WGWK-A05D (AJNetSDK HTTP API) 카메라용 — snapshot.cgi 폴링 방식
+            // 호스트는 위 IP 필드 재사용. 포트/계정/비번/스트림만 별도 보관.
+            public int WgwkPort;     // HTTP 포트 (0이면 80)
+            public string WgwkUser;  // 계정 (비면 admin)
+            public string WgwkPass;  // 비밀번호 (평문, 전송 시 MD5 해시 / 비면 123456)
+            public int WgwkStream;   // 캡처 스트림 (0=보조, 1=메인)
         }
 
         // 카메라 소스 종류 — IPCamera_Basic_Setting.CameraSource 값
@@ -107,7 +115,8 @@ namespace KyungsinLPR
             Default = 0,   // 전역 iNovaType 적용 (하위호환)
             iNova1 = 1,
             iNova2 = 2,
-            USB = 3
+            USB = 3,
+            WGWK = 4       // WGWK-A05D (HTTP API snapshot.cgi)
         }
 
         public struct IPCamera_Info

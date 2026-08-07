@@ -50,6 +50,7 @@ namespace KyungsinLPR
             try
             {
                 Util.Function.IniWriteValue("PASSCAR", "EXCEPT", GrpNo);
+                Except_GrpNo = Util.Function.IntTryParse(GrpNo);  // 캐시 즉시 갱신 → 재시작 없이 다음 정기차량 로드에 반영
             }
             catch (Exception) { }
         }
